@@ -1,0 +1,1 @@
+"""ParcelHub campus locker service."""

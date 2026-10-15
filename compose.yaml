@@ -1,0 +1,25 @@
+services:
+  parcelhub:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-8000}:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      APP_SECRET: ${APP_SECRET:-}
+      APP_ORIGIN: ${APP_ORIGIN:-}
+      DATA_DIR: /app/data
+      HARDWARE_MODE: ${HARDWARE_MODE:-simulated}
+      DEVICE_TOKEN: ${DEVICE_TOKEN:-}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - parcelhub-data:/app/data
+    init: true
+    stop_grace_period: 15s
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  parcelhub-data:
