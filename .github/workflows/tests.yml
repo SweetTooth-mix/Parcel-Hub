@@ -27,3 +27,15 @@ jobs:
         env:
           PYTHON: python
       - run: docker build -t parcelhub:test .
+      - name: Start container and verify health
+        run: |
+          docker run --detach --name parcelhub-smoke parcelhub:test
+          trap 'docker rm --force parcelhub-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec parcelhub-smoke python -c "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/health'))['status']=='ok'; assert json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/me'))['demo'] is True"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs parcelhub-smoke
+          exit 1
