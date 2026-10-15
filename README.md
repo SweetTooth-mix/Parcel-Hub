@@ -38,6 +38,8 @@ Windows PowerShell: gantikan arahan `source` dengan `.venv\Scripts\Activate.ps1`
 
 Antaramuka menggunakan Bahasa Melayu, menyokong telefon dan desktop, dan tidak memuatkan font, skrip atau model daripada CDN.
 
+Tema cerah/gelap mengikuti tetapan peranti secara lalai. Gunakan butang bulan/matahari di halaman log masuk atau bar atas untuk menukar tema. Pilihan disimpan dalam pelayar dan kekal selepas refresh atau log keluar. Pilih **Akaun & sistem → Tema paparan → Ikut peranti** untuk kembali mengikuti tema peranti.
+
 ## Cuba satu transaksi
 
 1. Pilih **Penerima** pada halaman log masuk. Akaun demo Aiman mempunyai dua parcel.

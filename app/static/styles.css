@@ -4,6 +4,7 @@
   font-display: swap;
 }
 :root {
+  color-scheme: light;
   --canvas: #f7f8fa;
   --paper: #fff;
   --ink: #172329;
@@ -27,6 +28,29 @@
   background: var(--canvas);
   font-synthesis: none;
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #11181c;
+  --paper: #1a242a;
+  --ink: #edf2f4;
+  --muted: #a5b4bd;
+  --line: #34434c;
+  --orange: #ff9461;
+  --orange-soft: #3c2a22;
+  --green: #7bd5b4;
+  --green-soft: #203c33;
+  --red: #ffafa4;
+  --shadow: 0 8px 32px #00000020;
+  --surface-soft: #202d34;
+  --surface-hover: #293943;
+  --text-secondary: #c4cfd5;
+  --red-soft: #422c2b;
+  --blue-soft: #25374d;
+  --blue: #a0c7ff;
+  --warm-soft: #372f24;
+  --warm-text: #dfbf92;
+  --stage: #202e29;
+}
 * {
   box-sizing: border-box;
 }
@@ -40,6 +64,7 @@ input,
 select,
 textarea {
   font: inherit;
+  color: inherit;
 }
 button,
 a,
@@ -339,6 +364,29 @@ textarea:focus {
   justify-content: center;
   border-radius: 11px;
   position: relative;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+.auth-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+.auth-tools .theme-toggle {
+  margin-left: auto;
+}
+.auth-tools .auth-brand-mobile {
+  margin-bottom: 0;
+}
+.theme-settings {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 20px;
 }
 .notif-dot {
   position: absolute;
@@ -1258,6 +1306,8 @@ tbody tr:hover {
   transform: rotate(-4deg);
 }
 .cabinet {
+  /* The model's physical materials stay independent of the page theme. */
+  color: #172329;
   --scale: 1;
   position: relative;
   display: flex;
@@ -1974,6 +2024,7 @@ tbody tr:hover {
 }
 /* Modal and feedback */
 dialog {
+  background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 20px;
   box-shadow: 0 40px 120px #102b3030;
@@ -2079,6 +2130,262 @@ dialog::backdrop {
 }
 .account-detail .line-row span {
   color: var(--muted);
+}
+/* Theme surfaces: QR paper and the physical cabinet retain their own colours. */
+:root[data-theme="dark"]
+  :is(
+    .sidebar,
+    .icon-button,
+    .stat,
+    .button.secondary,
+    .tab.active,
+    .searchbar,
+    .keypad button,
+    .demo-codes button,
+    .auth-shell
+  ) {
+  background: var(--paper);
+}
+:root[data-theme="dark"] .topbar {
+  background: #1a242ae6;
+}
+:root[data-theme="dark"]
+  :is(
+    .nav-link,
+    .brand-note,
+    .nav-label,
+    .breadcrumb,
+    .stat .stat-icon,
+    .stat-value small,
+    .stat-foot,
+    .hero-copy p,
+    .hero-badge,
+    .info-note,
+    .parcel-card .tracking,
+    .meta-grid span,
+    .parcel-card .deadline,
+    .footer,
+    .empty > .icon,
+    .tab,
+    .searchbar .icon,
+    th,
+    td small,
+    .table-caption,
+    .chart-day,
+    .legend,
+    .activity-mark,
+    .activity-item time,
+    .field small,
+    .notification time,
+    .locker-tile small,
+    .locker-tile .row .icon,
+    .scene-caption,
+    .station-top small,
+    .station-bottom > small,
+    .step-label,
+    .keypad button.subtle,
+    .kiosk-card .kiosk-bottom,
+    .kiosk-price small,
+    .story-copy p,
+    .story-footer,
+    .auth-switch,
+    .divider,
+    .demo-account
+  ) {
+  color: var(--muted);
+}
+:root[data-theme="dark"]
+  :is(
+    .breadcrumb b,
+    .button.secondary,
+    .parcel-card .courier-logo,
+    .field label,
+    .keypad button,
+    .scene-controls button
+  ) {
+  color: var(--text-secondary);
+}
+:root[data-theme="dark"]
+  :is(
+    .nav-badge,
+    .campus-card,
+    .stat .stat-icon,
+    .info-note,
+    .parcel-card .courier-logo,
+    .tabs,
+    th,
+    .about-card code,
+    .demo-account,
+    .step-line,
+    .scene-controls button
+  ) {
+  background: var(--surface-soft);
+}
+:root[data-theme="dark"]
+  :is(
+    .campus-card,
+    .stat .stat-icon,
+    td,
+    .activity-item,
+    .activity-mark,
+    .hero,
+    .station-panel,
+    .station-bottom,
+    .scene-controls button,
+    .auth-story::after
+  ) {
+  border-color: var(--line);
+}
+:root[data-theme="dark"]
+  :is(.nav-link:hover, tbody tr:hover, .keypad button:hover) {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+:root[data-theme="dark"]
+  :is(
+    .nav-link.active,
+    .pill.orange,
+    .stat .stat-icon.orange,
+    .pickup-highlight .large-icon,
+    .demo-account:hover
+  ) {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+:root[data-theme="dark"] .button.primary {
+  color: #28190f;
+}
+:root[data-theme="dark"] .button.primary:hover {
+  background: #ffac86;
+}
+:root[data-theme="dark"] :is(.button.dark, .skip-link) {
+  color: var(--canvas);
+}
+:root[data-theme="dark"] .button.secondary:hover {
+  border-color: var(--muted);
+}
+:root[data-theme="dark"] .pill {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+:root[data-theme="dark"] .pill.green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+:root[data-theme="dark"] .pill.orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+:root[data-theme="dark"] :is(.pill.red, .button.danger, .error-message) {
+  background: var(--red-soft);
+  color: var(--red);
+}
+:root[data-theme="dark"] .pill.blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+:root[data-theme="dark"] .tab.active {
+  color: var(--ink);
+}
+:root[data-theme="dark"] .step-line.active {
+  background: var(--orange);
+}
+:root[data-theme="dark"]
+  :is(.avatar, .demo-pill, .info-note.warning, .kiosk-demo) {
+  background: var(--warm-soft);
+  color: var(--warm-text);
+}
+:root[data-theme="dark"] .info-note.success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+:root[data-theme="dark"] .pickup-highlight {
+  background: linear-gradient(145deg, var(--paper), #2b2825);
+}
+:root[data-theme="dark"] .notification.unread {
+  background: #2c2824;
+}
+:root[data-theme="dark"] .chart {
+  background: repeating-linear-gradient(
+    to top,
+    transparent,
+    transparent 38px,
+    var(--line) 39px,
+    var(--line) 40px
+  );
+}
+:root[data-theme="dark"] :is(.chart-bar.light, .legend i.light) {
+  background: #789a88;
+}
+:root[data-theme="dark"] :is(.field input, .field select, .field textarea) {
+  background: var(--canvas);
+  border-color: #536773;
+}
+:root[data-theme="dark"] :is(input, textarea)::placeholder {
+  color: #9aabb6;
+  opacity: 1;
+}
+:root[data-theme="dark"] :is(input, select, textarea):focus {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+:root[data-theme="dark"] .locker-tile {
+  background: #202f2b;
+}
+:root[data-theme="dark"] .locker-tile.occupied {
+  background: var(--orange-soft);
+  border-color: #885d41;
+}
+:root[data-theme="dark"] .locker-tile.maintenance {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .locker-tile.open {
+  background: var(--green-soft);
+  border-color: #4d9178;
+}
+:root[data-theme="dark"] :is(.hero, .station-panel, .auth-story) {
+  background: var(--stage);
+}
+:root[data-theme="dark"] .scene {
+  background: radial-gradient(ellipse at 52% 52%, #3a4f41 0, transparent 65%);
+}
+:root[data-theme="dark"] .scene::before {
+  background: #00000055;
+}
+:root[data-theme="dark"] .auth-story .scene {
+  background: none;
+}
+:root[data-theme="dark"] .cabinet::after {
+  color: #afbfad;
+}
+:root[data-theme="dark"] .station-bottom {
+  background: #18231f80;
+}
+:root[data-theme="dark"] .otp-input {
+  background: var(--canvas) !important;
+  border-color: #536773 !important;
+}
+:root[data-theme="dark"] .keypad button:active {
+  background: var(--orange-soft);
+}
+:root[data-theme="dark"] :is(.kiosk-demo, .demo-codes button) {
+  border-color: #716047;
+}
+:root[data-theme="dark"] :is(.kiosk-demo strong, .demo-codes button) {
+  color: var(--warm-text);
+}
+:root[data-theme="dark"] .auth-small-note {
+  color: var(--muted) !important;
+}
+:root[data-theme="dark"] .notif-dot {
+  border-color: var(--paper);
+}
+:root[data-theme="dark"] dialog::backdrop {
+  background: #05090db3;
+}
+:root[data-theme="dark"] .mobile-overlay.visible {
+  background: #05090db3;
 }
 @media (min-width: 1600px) {
   .main-content {
@@ -2268,9 +2575,16 @@ dialog::backdrop {
   .breadcrumb {
     font-size: 10px;
     gap: 7px;
+    min-width: 0;
+  }
+  .breadcrumb b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .topbar-right {
     gap: 10px;
+    flex-shrink: 0;
   }
   .main-content {
     padding: 25px 20px;
@@ -2480,6 +2794,9 @@ dialog::backdrop {
     padding: 0 16px;
   }
   .topbar .breadcrumb > span {
+    display: none;
+  }
+  .topbar .demo-pill {
     display: none;
   }
   .page-head {

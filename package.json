@@ -4,7 +4,7 @@
   "private": true,
   "description": "Campus parcel management. Node is needed only for frontend integration tests.",
   "scripts": {
-    "check": "node --check app/static/app.js",
+    "check": "node --check app/static/theme.js && node --check app/static/app.js",
     "test:ui": "node --test tests/ui.test.mjs"
   },
   "devDependencies": {

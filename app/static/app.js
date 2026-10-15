@@ -68,6 +68,8 @@ const paths = {
   tool: "M14 6a5 5 0 0 0-6 6L2 18l4 4 6-6a5 5 0 0 0 6-6l-3 3-4-4z",
   receipt: "M5 3h14v19l-3-2-4 2-4-2-3 2zM8 7h8M8 11h8M8 15h5",
   mail: "M3 5h18v14H3zM3 5l9 8 9-8",
+  moon: "M20.9 13a9 9 0 0 1-9.9-9.9A9 9 0 1 0 20.9 13Z",
+  sun: "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
 };
 const icon = (name, cls = "") =>
   `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.box}"/></svg>`;
@@ -75,6 +77,21 @@ const button = (label, action, kind = "primary", ico = "", extra = "") =>
   `<button class="button ${kind}" data-action="${action}" ${extra}>${ico ? icon(ico) : ""}${label}</button>`;
 const brand = () =>
   '<div class="brand"><img src="/static/favicon.svg" alt=""><span>Parcel<b>Hub</b></span></div>';
+function themeToggle() {
+  const dark = window.ParcelHubTheme.current === "dark";
+  return `<button type="button" class="icon-button theme-toggle" data-action="toggle-theme" aria-label="Mod gelap" aria-pressed="${dark}" title="Tukar ke mod ${dark ? "cerah" : "gelap"}">${icon(dark ? "sun" : "moon")}</button>`;
+}
+function syncThemeControls() {
+  const dark = window.ParcelHubTheme.current === "dark";
+  for (const control of $$(".theme-toggle")) {
+    control.setAttribute("aria-pressed", String(dark));
+    control.title = `Tukar ke mod ${dark ? "cerah" : "gelap"}`;
+    control.innerHTML = icon(dark ? "sun" : "moon");
+  }
+  const select = $("#theme-preference");
+  if (select) select.value = window.ParcelHubTheme.preference;
+}
+window.addEventListener("parcelhub:theme-change", syncThemeControls);
 const state = {
   user: null,
   csrf: null,
@@ -261,14 +278,14 @@ function shell() {
               .join(""),
           )
         : "PH"
-    }</span><span class="user-info"><strong>${esc(u?.name || "Selamat datang")}</strong><small>${roleName(u?.role)}</small></span>${icon(u ? "chevron" : "user")}</button></div></aside><div class="shell-body"><header class="topbar"><div class="breadcrumb"><button class="icon-button menu-toggle" data-action="menu" aria-label="Buka menu">${icon("menu")}</button><span>Ruang kerja</span>${icon("chevron")}<b>${names[state.view] || "ParcelHub"}</b></div><div class="topbar-right"><span class="topbar-date">${new Intl.DateTimeFormat("ms-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).format(new Date())}</span>${state.demo ? '<span class="demo-pill">MOD DEMO</span>' : ""}${u ? `<button class="icon-button" data-action="nav" data-view="notifications" aria-label="Notifikasi">${icon("bell")}${unread ? '<i class="notif-dot"></i>' : ""}</button>` : button("Log masuk", "login-screen", "secondary", "user")}</div></header><main class="main-content" id="main" tabindex="-1"><div id="view"></div><footer class="footer"><span>© ${new Date().getFullYear()} ParcelHub. Dibina untuk kehidupan kampus.</span><span><span class="status-dot"></span>${state.hardware_mode === "simulated" ? "Simulasi loker · Data disimpan di server" : "Kawalan peranti · PAP-01"}</span></footer></main></div></div>`;
+    }</span><span class="user-info"><strong>${esc(u?.name || "Selamat datang")}</strong><small>${roleName(u?.role)}</small></span>${icon(u ? "chevron" : "user")}</button></div></aside><div class="shell-body"><header class="topbar"><div class="breadcrumb"><button class="icon-button menu-toggle" data-action="menu" aria-label="Buka menu">${icon("menu")}</button><span>Ruang kerja</span>${icon("chevron")}<b>${names[state.view] || "ParcelHub"}</b></div><div class="topbar-right"><span class="topbar-date">${new Intl.DateTimeFormat("ms-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).format(new Date())}</span>${state.demo ? '<span class="demo-pill">MOD DEMO</span>' : ""}${themeToggle()}${u ? `<button class="icon-button" data-action="nav" data-view="notifications" aria-label="Notifikasi">${icon("bell")}${unread ? '<i class="notif-dot"></i>' : ""}</button>` : button("Log masuk", "login-screen", "secondary", "user")}</div></header><main class="main-content" id="main" tabindex="-1"><div id="view"></div><footer class="footer"><span>© ${new Date().getFullYear()} ParcelHub. Dibina untuk kehidupan kampus.</span><span><span class="status-dot"></span>${state.hardware_mode === "simulated" ? "Simulasi loker · Data disimpan di server" : "Kawalan peranti · PAP-01"}</span></footer></main></div></div>`;
 }
 function renderAuth(register = false) {
   state.view = "auth";
   clearInterval(state.poll);
   document.title = "Log masuk · ParcelHub";
   $("#app").innerHTML =
-    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-brand-mobile">${brand()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">Data contoh. Tiada bayaran atau mesej luaran dihantar.</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`;
+    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">Data contoh. Tiada bayaran atau mesej luaran dihantar.</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`;
 }
 function parcelCard(p) {
   return `<article class="panel parcel-card"><div class="row"><div class="courier-logo">${esc(
@@ -528,7 +545,8 @@ function renderSettings() {
       "Tetapan anda.",
       "Maklumat akaun dan status konfigurasi ParcelHub.",
     ) +
-    `<div class="grid-two"><section class="panel panel-pad"><h3>Maklumat akaun</h3><div class="account-detail"><div class="line-row row"><span>Nama</span><strong>${esc(state.user.name)}</strong></div><div class="line-row row"><span>E-mel</span><strong>${esc(state.user.email)}</strong></div><div class="line-row row"><span>ID kampus</span><strong>${esc(state.user.student_id)}</strong></div><div class="line-row row"><span>Peranan</span><strong>${roleName(state.user.role)}</strong></div></div><div class="head-actions">${button("Tukar kata laluan", "password-modal", "secondary", "lock")}${button("Log keluar", "logout", "quiet", "logout")}</div></section><section class="panel panel-pad"><h3>Status aplikasi</h3><div class="account-detail"><div class="line-row row"><span>Persekitaran</span><strong>${state.demo ? "Demonstrasi" : "Operasi"}</strong></div><div class="line-row row"><span>Sensor pintu</span><strong>${state.hardware_mode === "simulated" ? "Simulasi" : "API peranti"}</strong></div><div class="line-row row"><span>Notifikasi</span><strong>Dalam aplikasi</strong></div><div class="line-row row"><span>Bayaran</span><strong>${state.demo ? "Simulasi" : "Kaunter / adapter webhook"}</strong></div><div class="line-row row"><span>Storan</span><strong>SQLite · server</strong></div></div>${state.user.role === "admin" ? `<a class="button secondary" href="/api/admin/export.csv">${icon("download")}Eksport rekod CSV</a>` : ""}</section></div>`;
+    `<div class="grid-two"><section class="panel panel-pad"><h3>Maklumat akaun</h3><div class="account-detail"><div class="line-row row"><span>Nama</span><strong>${esc(state.user.name)}</strong></div><div class="line-row row"><span>E-mel</span><strong>${esc(state.user.email)}</strong></div><div class="line-row row"><span>ID kampus</span><strong>${esc(state.user.student_id)}</strong></div><div class="line-row row"><span>Peranan</span><strong>${roleName(state.user.role)}</strong></div></div><div class="head-actions">${button("Tukar kata laluan", "password-modal", "secondary", "lock")}${button("Log keluar", "logout", "quiet", "logout")}</div><div class="theme-settings field"><label for="theme-preference">Tema paparan</label><select id="theme-preference" aria-describedby="theme-hint"><option value="system">Ikut peranti</option><option value="light">Cerah</option><option value="dark">Gelap</option></select><small id="theme-hint">Pilihan tema disimpan dalam pelayar ini.</small></div></section><section class="panel panel-pad"><h3>Status aplikasi</h3><div class="account-detail"><div class="line-row row"><span>Persekitaran</span><strong>${state.demo ? "Demonstrasi" : "Operasi"}</strong></div><div class="line-row row"><span>Sensor pintu</span><strong>${state.hardware_mode === "simulated" ? "Simulasi" : "API peranti"}</strong></div><div class="line-row row"><span>Notifikasi</span><strong>Dalam aplikasi</strong></div><div class="line-row row"><span>Bayaran</span><strong>${state.demo ? "Simulasi" : "Kaunter / adapter webhook"}</strong></div><div class="line-row row"><span>Storan</span><strong>SQLite · server</strong></div></div>${state.user.role === "admin" ? `<a class="button secondary" href="/api/admin/export.csv">${icon("download")}Eksport rekod CSV</a>` : ""}</section></div>`;
+  syncThemeControls();
 }
 function renderKiosk() {
   $("#view").innerHTML =
@@ -872,6 +890,11 @@ async function signedIn(result) {
 async function handleAction(el) {
   const action = el.dataset.action;
   switch (action) {
+    case "toggle-theme":
+      window.ParcelHubTheme.set(
+        window.ParcelHubTheme.current === "dark" ? "light" : "dark",
+      );
+      break;
     case "nav":
       closeModal();
       go(el.dataset.view);
@@ -1220,6 +1243,8 @@ document.addEventListener("input", (event) => {
 });
 document.addEventListener("change", (event) => {
   if (event.target.id === "size") updateDepositLockers();
+  if (event.target.id === "theme-preference")
+    window.ParcelHubTheme.set(event.target.value);
 });
 $("#modal").addEventListener("close", stopScan);
 window.addEventListener("hashchange", route);

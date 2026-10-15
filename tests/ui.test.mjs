@@ -79,6 +79,7 @@ test(
         );
     try {
       doc.write(await readFile("app/static/index.html", "utf8"));
+      window.eval(await readFile("app/static/theme.js", "utf8"));
       window.eval(await readFile("app/static/app.js", "utf8"));
       await click('[data-action="demo-login"][data-role="recipient"]');
       await wait(
