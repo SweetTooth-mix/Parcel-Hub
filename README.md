@@ -40,6 +40,8 @@ Antaramuka menggunakan Bahasa Melayu, menyokong telefon dan desktop, dan tidak m
 
 Tema cerah/gelap mengikuti tetapan peranti secara lalai. Gunakan butang bulan/matahari di halaman log masuk atau bar atas untuk menukar tema. Pilihan disimpan dalam pelayar dan kekal selepas refresh atau log keluar. Pilih **Akaun & sistem → Tema paparan → Ikut peranti** untuk kembali mengikuti tema peranti.
 
+Palet navy, teal dan champagne digunakan pada kedua-dua tema. Kad muncul ketika masuk ke paparan, tajuk muncul mengikut perkataan, dan butang memberi respons hover/klik. Skeleton loading digunakan semasa memuatkan rekod; butang menunjukkan pemprosesan sehingga permintaan selesai atau gagal. Carian dan kemas kini latar belakang tidak mengulang animasi masuk. Tetapan **Reduce motion** peranti menghentikan animasi hiasan; kandungan kekal boleh dibaca walaupun API animasi tidak tersedia.
+
 ## Aktifkan Telegram (pilihan)
 
 1. Cipta bot khusus ParcelHub melalui [@BotFather](https://t.me/BotFather), menggunakan `/newbot`.

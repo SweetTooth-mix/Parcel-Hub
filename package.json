@@ -4,8 +4,8 @@
   "private": true,
   "description": "Campus parcel management. Node is needed only for frontend integration tests.",
   "scripts": {
-    "check": "node --check app/static/theme.js && node --check app/static/app.js",
-    "test:ui": "node --test tests/ui.test.mjs"
+    "check": "node --check app/static/theme.js && node --check app/static/motion.js && node --check app/static/app.js",
+    "test:ui": "node --test tests/ui.test.mjs tests/motion.test.mjs"
   },
   "devDependencies": {
     "happy-dom": "^20.0.0"

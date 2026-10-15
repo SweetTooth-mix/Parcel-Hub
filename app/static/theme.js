@@ -23,7 +23,7 @@
     document.documentElement.dataset.theme = theme;
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#11181c" : "#f7f8fa");
+      ?.setAttribute("content", theme === "dark" ? "#0c1727" : "#f3f5f8");
     window.dispatchEvent(new Event("parcelhub:theme-change"));
   }
 

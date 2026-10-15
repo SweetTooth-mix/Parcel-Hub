@@ -80,18 +80,90 @@ test(
     try {
       doc.write(await readFile("app/static/index.html", "utf8"));
       window.eval(await readFile("app/static/theme.js", "utf8"));
+      window.eval(await readFile("app/static/motion.js", "utf8"));
       window.eval(await readFile("app/static/app.js", "utf8"));
+      await wait(() => doc.querySelector("#auth-form"), "Login missing");
+      // A slow, rejected request must keep its label, block duplicates and recover.
+      const realFetch = window.fetch;
+      let releaseLogin;
+      let loginRequests = 0;
+      window.fetch = (url, options) => {
+        if (url !== "/api/auth/login") return realFetch(url, options);
+        loginRequests++;
+        return new Promise((resolve) => {
+          releaseLogin = resolve;
+        });
+      };
+      const loginButton = doc.querySelector('#auth-form [type="submit"]');
+      const loginLabel = loginButton.textContent;
+      submit("#auth-form");
+      await wait(
+        () => loginButton.classList.contains("is-loading"),
+        "Loading feedback missing",
+      );
+      assert.equal(loginButton.disabled, true);
+      assert.equal(loginButton.getAttribute("aria-busy"), "true");
+      assert.equal(loginButton.textContent, loginLabel);
+      submit("#auth-form");
+      assert.equal(loginRequests, 1);
+      releaseLogin(
+        new window.Response(
+          JSON.stringify({ detail: "Log masuk gagal. Cuba semula." }),
+          { status: 401 },
+        ),
+      );
+      await wait(
+        () => !loginButton.disabled,
+        "Button stuck after failed request",
+      );
+      assert.equal(loginButton.hasAttribute("aria-busy"), false);
+      assert.equal(loginButton.classList.contains("is-loading"), false);
+      assert.match(
+        doc.querySelector(".error-message").textContent,
+        /Log masuk gagal/,
+      );
+      window.fetch = realFetch;
       await click('[data-action="demo-login"][data-role="recipient"]');
       await wait(
         () => doc.querySelector("h1")?.textContent.includes("Aiman"),
         "Recipient dashboard did not load",
       );
       assert.equal(doc.querySelectorAll(".parcel-card").length, 2);
+      window.ParcelHubTheme.set("light");
+      await click('[data-action="toggle-theme"]');
+      assert.equal(doc.documentElement.dataset.theme, "dark");
+      assert.equal(
+        doc.querySelector('meta[name="theme-color"]').content,
+        "#0c1727",
+      );
+      assert.equal(window.localStorage.getItem("parcelhub-theme"), "dark");
+      await click('[data-action="toggle-theme"]');
+      assert.equal(doc.documentElement.dataset.theme, "light");
+      let releaseSettings;
+      window.fetch = (url, options) =>
+        url === "/api/telegram"
+          ? new Promise((resolve) => {
+              releaseSettings = () => resolve(realFetch(url, options));
+            })
+          : realFetch(url, options);
       await click('[data-action="nav"][data-view="settings"]');
+      assert.equal(
+        doc.querySelector("#view").getAttribute("aria-busy"),
+        "true",
+      );
+      assert.equal(doc.querySelectorAll(".skeleton-card").length, 4);
+      assert.match(
+        doc.querySelector('[role="status"]').textContent,
+        /Memuatkan rekod/,
+      );
+      releaseSettings();
+      window.fetch = realFetch;
       await wait(
         () => doc.querySelector(".telegram-panel"),
         "Telegram settings missing",
       );
+      assert.equal(doc.querySelector("#view").hasAttribute("aria-busy"), false);
+      assert.equal(doc.querySelector(".loading-view"), null);
       assert.match(
         doc.querySelector(".telegram-panel").textContent,
         /belum diaktifkan/,

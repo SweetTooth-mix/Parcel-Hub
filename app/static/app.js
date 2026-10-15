@@ -73,7 +73,7 @@ const paths = {
   sun: "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
 };
 const icon = (name, cls = "") =>
-  `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.box}"/></svg>`;
+  `<svg class="icon icon-${name} ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.box}"/></svg>`;
 const button = (label, action, kind = "primary", ico = "", extra = "") =>
   `<button class="button ${kind}" data-action="${action}" ${extra}>${ico ? icon(ico) : ""}${label}</button>`;
 const brand = () =>
@@ -129,7 +129,7 @@ const labels = {
   CANCELLED: "Dibatalkan",
 };
 const statusPill = (p) =>
-  `<span class="pill ${p.status === "READY" ? (p.fees?.overdue ? "orange" : "green") : ["ISSUE"].includes(p.status) ? "red" : ["PICKUP_OPEN", "UNLOCK_PENDING", "RESERVED"].includes(p.status) ? "blue" : ""}">${p.status === "READY" && p.fees?.overdue ? "Lewat tempoh" : labels[p.status] || esc(p.status)}</span>`;
+  `<span class="pill ${p.status === "READY" ? (p.fees?.overdue ? "warning" : "green") : ["ISSUE"].includes(p.status) ? "red" : ["PICKUP_OPEN", "UNLOCK_PENDING", "RESERVED"].includes(p.status) ? "blue" : ""}">${p.status === "READY" && p.fees?.overdue ? "Lewat tempoh" : labels[p.status] || esc(p.status)}</span>`;
 
 async function api(url, method = "GET", data) {
   const response = await fetch(url, {
@@ -165,6 +165,19 @@ async function api(url, method = "GET", data) {
   }
   return result;
 }
+function paint(target, html) {
+  const element = typeof target === "string" ? $(target) : target;
+  element.innerHTML = html;
+  window.ParcelHubMotion?.reveal(element);
+}
+function quietly(callback) {
+  return window.ParcelHubMotion
+    ? window.ParcelHubMotion.withoutEntrance(callback)
+    : callback();
+}
+function loadingView() {
+  return `<div class="loading-view" role="status"><span class="sr-only">Memuatkan rekod…</span><div aria-hidden="true"><div class="skeleton skeleton-eyebrow"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-subtitle"></div><div class="skeleton-stats">${Array.from({ length: 4 }, () => '<div class="skeleton-card"><div class="skeleton skeleton-label"></div><div class="skeleton skeleton-value"></div></div>').join("")}</div><div class="skeleton-panel"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div></div></div>`;
+}
 function toast(message, error = false) {
   const el = document.createElement("div");
   el.className = `toast${error ? " error" : ""}`;
@@ -172,7 +185,10 @@ function toast(message, error = false) {
   el.innerHTML =
     icon(error ? "info" : "check") + `<span>${esc(message)}</span>`;
   $("#toasts").append(el);
-  setTimeout(() => el.remove(), 5000);
+  setTimeout(() => {
+    el.classList.add("is-leaving");
+    setTimeout(() => el.remove(), 180);
+  }, 5000);
 }
 function stopScan() {
   clearTimeout(state.scanTimer);
@@ -184,6 +200,7 @@ function openModal(title, content) {
   const d = $("#modal");
   d.innerHTML = `<div class="modal-header"><h2 id="modal-title">${esc(title)}</h2><button class="icon-button" data-action="close-modal" aria-label="Tutup">${icon("close")}</button></div><div class="modal-body">${content}</div>`;
   if (!d.open) d.showModal();
+  window.ParcelHubMotion?.reveal(d);
 }
 function closeModal() {
   stopScan();
@@ -202,7 +219,7 @@ function field(label, name, type = "text", placeholder = "", extra = "") {
   return `<div class="field"><label for="f-${name}">${label}</label><input id="f-${name}" name="${name}" type="${type}" placeholder="${placeholder}" ${extra}></div>`;
 }
 function stat(label, value, foot, ico = "box", highlight = false) {
-  return `<div class="stat"><span class="stat-icon ${highlight ? "orange" : ""}">${icon(ico)}</span><p class="stat-label">${label}</p><div class="stat-value">${value}</div><div class="stat-foot">${foot}</div></div>`;
+  return `<div class="stat"><span class="stat-icon ${highlight ? "accent" : ""}">${icon(ico)}</span><p class="stat-label">${label}</p><div class="stat-value">${value}</div><div class="stat-foot">${foot}</div></div>`;
 }
 function pageHead(eyebrow, title, subtitle, actions = "") {
   return `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div><div class="head-actions">${actions}</div></div>`;
@@ -270,7 +287,8 @@ function shell() {
     (u?.role === "admin" ? navLink("users", "Pengguna", "users") : "") +
     navLink("help", "Panduan", "help") +
     (u ? navLink("settings", "Akaun & sistem", "settings") : "");
-  $("#app").innerHTML =
+  paint(
+    "#app",
     `<div class="shell"><div class="mobile-overlay" data-action="close-menu"></div><aside class="sidebar">${brand()}<div class="brand-note">CAMPUS PARCEL SERVICE</div><div class="nav-label">RUANG KERJA</div><nav class="nav-list" aria-label="Menu utama">${mainNav}</nav><div class="nav-label">LAIN-LAIN</div><nav class="nav-list" aria-label="Menu tambahan">${utility}</nav><div class="sidebar-bottom"><div class="campus-card"><strong><span class="status-dot"></span>Stesen PAP-01</strong><p>Pusat Aktiviti Pelajar<br>${state.demo ? "Persekitaran demonstrasi" : "Akses tertakluk waktu kampus"}</p></div><button class="user-chip" data-action="${u ? "account" : "login-screen"}"><span class="avatar">${
       u
         ? esc(
@@ -281,14 +299,17 @@ function shell() {
               .join(""),
           )
         : "PH"
-    }</span><span class="user-info"><strong>${esc(u?.name || "Selamat datang")}</strong><small>${roleName(u?.role)}</small></span>${icon(u ? "chevron" : "user")}</button></div></aside><div class="shell-body"><header class="topbar"><div class="breadcrumb"><button class="icon-button menu-toggle" data-action="menu" aria-label="Buka menu">${icon("menu")}</button><span>Ruang kerja</span>${icon("chevron")}<b>${names[state.view] || "ParcelHub"}</b></div><div class="topbar-right"><span class="topbar-date">${new Intl.DateTimeFormat("ms-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).format(new Date())}</span>${state.demo ? '<span class="demo-pill">MOD DEMO</span>' : ""}${themeToggle()}${u ? `<button class="icon-button" data-action="nav" data-view="notifications" aria-label="Notifikasi">${icon("bell")}${unread ? '<i class="notif-dot"></i>' : ""}</button>` : button("Log masuk", "login-screen", "secondary", "user")}</div></header><main class="main-content" id="main" tabindex="-1"><div id="view"></div><footer class="footer"><span>© ${new Date().getFullYear()} ParcelHub. Dibina untuk kehidupan kampus.</span><span><span class="status-dot"></span>${state.hardware_mode === "simulated" ? "Simulasi loker · Data disimpan di server" : "Kawalan peranti · PAP-01"}</span></footer></main></div></div>`;
+    }</span><span class="user-info"><strong>${esc(u?.name || "Selamat datang")}</strong><small>${roleName(u?.role)}</small></span>${icon(u ? "chevron" : "user")}</button></div></aside><div class="shell-body"><header class="topbar"><div class="breadcrumb"><button class="icon-button menu-toggle" data-action="menu" aria-label="Buka menu">${icon("menu")}</button><span>Ruang kerja</span>${icon("chevron")}<b>${names[state.view] || "ParcelHub"}</b></div><div class="topbar-right"><span class="topbar-date">${new Intl.DateTimeFormat("ms-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).format(new Date())}</span>${state.demo ? '<span class="demo-pill">MOD DEMO</span>' : ""}${themeToggle()}${u ? `<button class="icon-button" data-action="nav" data-view="notifications" aria-label="Notifikasi">${icon("bell")}${unread ? '<i class="notif-dot"></i>' : ""}</button>` : button("Log masuk", "login-screen", "secondary", "user")}</div></header><main class="main-content" id="main" tabindex="-1"><div id="view"></div><footer class="footer"><span>© ${new Date().getFullYear()} ParcelHub. Dibina untuk kehidupan kampus.</span><span><span class="status-dot"></span>${state.hardware_mode === "simulated" ? "Simulasi loker · Data disimpan di server" : "Kawalan peranti · PAP-01"}</span></footer></main></div></div>`,
+  );
 }
 function renderAuth(register = false) {
   state.view = "auth";
   clearInterval(state.poll);
   document.title = "Log masuk · ParcelHub";
-  $("#app").innerHTML =
-    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">${state.telegramEnabled ? "Data contoh. Bayaran simulasi; Telegram menghantar mesej sebenar jika disambung." : "Data contoh. Tiada bayaran atau mesej luaran dihantar."}</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`;
+  paint(
+    "#app",
+    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">${state.telegramEnabled ? "Data contoh. Bayaran simulasi; Telegram menghantar mesej sebenar jika disambung." : "Data contoh. Tiada bayaran atau mesej luaran dihantar."}</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`,
+  );
 }
 function parcelCard(p) {
   return `<article class="panel parcel-card"><div class="row"><div class="courier-logo">${esc(
@@ -305,14 +326,16 @@ function renderHome() {
     (p) => !["COLLECTED", "CANCELLED"].includes(p.status),
   );
   const ready = active.find((p) => p.status === "READY");
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "RUANG PENERIMA",
       `Hai, ${esc(state.user.name.split(" ")[0])}.`,
       "Semua parcel kampus kau, dalam satu tempat.",
       button("Buka kiosk", "nav", "secondary", "scan", 'data-view="kiosk"'),
     ) +
-    `<div class="stats">${stat("Parcel aktif", active.length, "Menunggu pengambilan", "box", true)}${stat("Sedia diambil", active.filter((p) => p.status === "READY").length, '<span class="status-dot"></span> Di stesen PAP-01', "check")}${stat("Baki caj", money(active.reduce((n, p) => n + p.fees.due_cents, 0)), "Caj berdasarkan tempoh simpanan", "wallet")}${stat("Selesai diambil", state.parcels.filter((p) => p.status === "COLLECTED").length, "Rekod pengambilan anda", "receipt")}</div><div class="grid-two"><section class="hero"><div class="hero-copy"><div class="hero-badge"><span class="status-dot"></span> PARCELHUB · PAP-01</div><h2>Jadual padat?<br>Parcel <em>tunggu kau.</em></h2><p>Datang ke PAP, sahkan kod dan ambil parcel. Semudah itu.</p>${button("Cara pengambilan", "help-modal", "dark", "arrow")}</div>${cabinet({ compact: true })}</section><section class="panel pickup-highlight"><div><div class="row"><div class="large-icon">${icon("box")}</div><span class="pill ${ready ? "green" : ""}">${ready ? "Sedia diambil" : "Semua terurus"}</span></div><h3>${ready ? "Ada parcel untuk kau." : "Belum ada parcel baharu."}</h3><p>${ready ? esc(ready.courier) + " · " + esc(ready.size) + " / " + date(ready.deposited_at) : "Notifikasi akan muncul selepas operator menyimpan parcel."}</p></div>${ready ? `<div class="row" style="margin:16px 0"><div><div class="tiny muted">LOKER PENGAMBILAN</div><div class="locker-number">${ready.locker_id}</div></div><div style="text-align:right"><div class="tiny muted">BAKI CAJ</div><strong>${money(ready.fees.due_cents)}</strong></div></div>${button("Dapatkan kod pengambilan", "code", "primary full", "qr", `data-id="${ready.id}"`)}` : `<div class="info-note">${icon("bell")}Kami akan maklumkan dalam aplikasi ini.</div>`}</section></div><div class="section-head"><h2>Parcel terkini <small class="muted">(${active.length})</small></h2>${button("Lihat semua", "nav", "quiet", "arrow", 'data-view="parcels"')}</div><div class="parcel-cards">${active.slice(0, 3).map(parcelCard).join("") || `<div class="panel" style="grid-column:1/-1">${empty("Tiada parcel aktif", "Parcel baharu akan disenaraikan di sini selepas didaftarkan.")}</div>`}</div><div class="info-note">${icon("info")}Caj asas RM0.50–RM1.00. Selepas 24 jam, caj tambahan RM1.00 bagi setiap blok 6 jam yang bermula. Akses loker tertakluk waktu akses kampus.</div>`;
+      `<div class="stats">${stat("Parcel aktif", active.length, "Menunggu pengambilan", "box", true)}${stat("Sedia diambil", active.filter((p) => p.status === "READY").length, '<span class="status-dot"></span> Di stesen PAP-01', "check")}${stat("Baki caj", money(active.reduce((n, p) => n + p.fees.due_cents, 0)), "Caj berdasarkan tempoh simpanan", "wallet")}${stat("Selesai diambil", state.parcels.filter((p) => p.status === "COLLECTED").length, "Rekod pengambilan anda", "receipt")}</div><div class="grid-two"><section class="hero"><div class="hero-copy"><div class="hero-badge"><span class="status-dot"></span> PARCELHUB · PAP-01</div><h2>Jadual padat?<br>Parcel <em>tunggu kau.</em></h2><p>Datang ke PAP, sahkan kod dan ambil parcel. Semudah itu.</p>${button("Cara pengambilan", "help-modal", "dark", "arrow")}</div>${cabinet({ compact: true })}</section><section class="panel pickup-highlight"><div><div class="row"><div class="large-icon">${icon("box")}</div><span class="pill ${ready ? "green" : ""}">${ready ? "Sedia diambil" : "Semua terurus"}</span></div><h3>${ready ? "Ada parcel untuk kau." : "Belum ada parcel baharu."}</h3><p>${ready ? esc(ready.courier) + " · " + esc(ready.size) + " / " + date(ready.deposited_at) : "Notifikasi akan muncul selepas operator menyimpan parcel."}</p></div>${ready ? `<div class="row" style="margin:16px 0"><div><div class="tiny muted">LOKER PENGAMBILAN</div><div class="locker-number">${ready.locker_id}</div></div><div style="text-align:right"><div class="tiny muted">BAKI CAJ</div><strong>${money(ready.fees.due_cents)}</strong></div></div>${button("Dapatkan kod pengambilan", "code", "primary full", "qr", `data-id="${ready.id}"`)}` : `<div class="info-note">${icon("bell")}Kami akan maklumkan dalam aplikasi ini.</div>`}</section></div><div class="section-head"><h2>Parcel terkini <small class="muted">(${active.length})</small></h2>${button("Lihat semua", "nav", "quiet", "arrow", 'data-view="parcels"')}</div><div class="parcel-cards">${active.slice(0, 3).map(parcelCard).join("") || `<div class="panel" style="grid-column:1/-1">${empty("Tiada parcel aktif", "Parcel baharu akan disenaraikan di sini selepas didaftarkan.")}</div>`}</div><div class="info-note">${icon("info")}Caj asas RM0.50–RM1.00. Selepas 24 jam, caj tambahan RM1.00 bagi setiap blok 6 jam yang bermula. Akses loker tertakluk waktu akses kampus.</div>`,
+  );
 }
 function filteredParcels() {
   return state.parcels.filter((p) => {
@@ -339,7 +362,8 @@ function parcelTable(items, short = false) {
 }
 function renderParcels() {
   const staff = state.user.role !== "recipient";
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       staff ? "PENGURUSAN PARCEL" : "RUANG PENERIMA",
       staff ? "Semua parcel." : "Parcel saya.",
@@ -354,27 +378,30 @@ function renderParcels() {
           )
         : "",
     ) +
-    `<div class="toolbar"><div class="tabs" role="tablist" aria-label="Penapis parcel">${[
-      ["active", "Aktif"],
-      ["overdue", "Lewat"],
-      ["history", "Sejarah"],
-      ["all", "Semua"],
-    ]
-      .map(
-        ([v, l]) =>
-          `<button role="tab" aria-selected="${state.tab === v}" class="tab ${state.tab === v ? "active" : ""}" data-action="filter-tab" data-tab="${v}">${l}</button>`,
-      )
-      .join(
-        "",
-      )}</div><label class="searchbar">${icon("search")}<input id="parcel-search" value="${esc(state.search)}" placeholder="Cari tracking, loker…" aria-label="Cari parcel"></label></div><div id="parcel-results"></div>`;
+      `<div class="toolbar"><div class="tabs" role="tablist" aria-label="Penapis parcel">${[
+        ["active", "Aktif"],
+        ["overdue", "Lewat"],
+        ["history", "Sejarah"],
+        ["all", "Semua"],
+      ]
+        .map(
+          ([v, l]) =>
+            `<button role="tab" aria-selected="${state.tab === v}" class="tab ${state.tab === v ? "active" : ""}" data-action="filter-tab" data-tab="${v}">${l}</button>`,
+        )
+        .join(
+          "",
+        )}</div><label class="searchbar">${icon("search")}<input id="parcel-search" value="${esc(state.search)}" placeholder="Cari tracking, loker…" aria-label="Cari parcel"></label></div><div id="parcel-results"></div>`,
+  );
   renderParcelResults();
 }
 function renderParcelResults() {
   const rows = filteredParcels();
-  $("#parcel-results").innerHTML =
+  paint(
+    "#parcel-results",
     state.user.role !== "recipient"
       ? `<section class="panel">${parcelTable(rows)}</section>`
-      : `<div class="parcel-cards">${rows.map(parcelCard).join("") || `<div class="panel" style="grid-column:1/-1">${empty("Tiada parcel sepadan", "Semak penapis atau tunggu notifikasi parcel baharu.", "search")}</div>`}</div>`;
+      : `<div class="parcel-cards">${rows.map(parcelCard).join("") || `<div class="panel" style="grid-column:1/-1">${empty("Tiada parcel sepadan", "Semak penapis atau tunggu notifikasi parcel baharu.", "search")}</div>`}</div>`,
+  );
 }
 function renderOverview() {
   const o = state.overview;
@@ -382,22 +409,24 @@ function renderOverview() {
     1,
     ...o.trend.flatMap((d) => [d.deposited, d.collected]),
   );
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "PUSAT OPERASI",
       "Setiap parcel, dalam kawalan.",
       "Pantau aktiviti dan kapasiti stesen PAP-01 hari ini.",
       button("Daftar parcel", "nav", "primary", "plus", 'data-view="deposit"'),
     ) +
-    `<div class="stats">${stat("Parcel aktif", o.active, "Dalam simpanan & pengambilan", "box", true)}${stat("Loker tersedia", `${state.station.available}<small>/ 16</small>`, "Sedia untuk parcel baharu", "grid")}${stat("Lewat tempoh", o.overdue, "Melebihi tempoh asas 24 jam", "clock")}${stat("Kutipan hari ini", money(o.revenue_today_cents), state.demo ? "Transaksi simulasi hari ini" : "Bayaran disahkan hari ini", "wallet")}</div><div class="grid-two"><section class="panel"><div class="panel-head"><div><h2>Pergerakan parcel</h2><p>Tujuh hari terakhir · rekod sebenar aplikasi</p></div><div class="legend"><span><i></i>Masuk</span><span><i class="light"></i>Diambil</span></div></div><div class="chart" role="img" aria-label="${esc(o.trend.map((d) => `${d.day}: ${d.deposited} masuk, ${d.collected} diambil`).join("; "))}">${o.trend.map((d) => `<div class="chart-col" title="${d.day}: ${d.deposited} masuk, ${d.collected} diambil"><div class="chart-bar" style="height:${Math.max(2, (d.deposited / max) * 100)}%"></div><div class="chart-bar light" style="height:${Math.max(2, (d.collected / max) * 100)}%"></div><span class="chart-day">${d.day}</span></div>`).join("")}</div><div class="row" style="padding:0 25px 25px"><div><div class="tiny muted">DIAMBIL HARI INI</div><strong>${o.collected_today} parcel</strong></div><div style="text-align:right"><div class="tiny muted">PURATA BUKA → TUTUP</div><strong>${o.average_pickup_seconds === null ? "Belum ada ukuran" : o.average_pickup_seconds + " saat"}</strong><p class="tiny">${o.measurement_count} pengambilan diukur${state.hardware_mode === "simulated" ? " · simulasi" : ""}</p></div></div></section><section class="panel"><div class="panel-head"><div><h2>Aktiviti terkini</h2><p>Jejak tindakan sistem dan operator</p></div>${icon("clock")}</div><div class="activity">${o.activity
-      .slice(0, 4)
-      .map(
-        (a) =>
-          `<div class="activity-item"><div class="activity-mark">${icon(a.action.includes("PAYMENT") ? "wallet" : a.action.includes("DOOR") ? "lock" : "box")}</div><div><strong>${actionLabel(a.action)}</strong><p>${esc(a.parcel_id || a.detail || "PAP-01")}</p></div><time>${new Date(a.created_at * 1000).toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kuala_Lumpur" })}</time></div>`,
-      )
-      .join(
-        "",
-      )}</div></section></div><div class="section-head"><h2>Parcel terkini</h2>${button("Lihat semua", "nav", "quiet", "arrow", 'data-view="parcels"')}</div><section class="panel">${parcelTable(state.parcels.slice(0, 5), true)}</section>`;
+      `<div class="stats">${stat("Parcel aktif", o.active, "Dalam simpanan & pengambilan", "box", true)}${stat("Loker tersedia", `${state.station.available}<small>/ 16</small>`, "Sedia untuk parcel baharu", "grid")}${stat("Lewat tempoh", o.overdue, "Melebihi tempoh asas 24 jam", "clock")}${stat("Kutipan hari ini", money(o.revenue_today_cents), state.demo ? "Transaksi simulasi hari ini" : "Bayaran disahkan hari ini", "wallet")}</div><div class="grid-two"><section class="panel"><div class="panel-head"><div><h2>Pergerakan parcel</h2><p>Tujuh hari terakhir · rekod sebenar aplikasi</p></div><div class="legend"><span><i></i>Masuk</span><span><i class="light"></i>Diambil</span></div></div><div class="chart" role="img" aria-label="${esc(o.trend.map((d) => `${d.day}: ${d.deposited} masuk, ${d.collected} diambil`).join("; "))}">${o.trend.map((d) => `<div class="chart-col" title="${d.day}: ${d.deposited} masuk, ${d.collected} diambil"><div class="chart-bar" style="height:${Math.max(2, (d.deposited / max) * 100)}%"></div><div class="chart-bar light" style="height:${Math.max(2, (d.collected / max) * 100)}%"></div><span class="chart-day">${d.day}</span></div>`).join("")}</div><div class="row" style="padding:0 25px 25px"><div><div class="tiny muted">DIAMBIL HARI INI</div><strong>${o.collected_today} parcel</strong></div><div style="text-align:right"><div class="tiny muted">PURATA BUKA → TUTUP</div><strong>${o.average_pickup_seconds === null ? "Belum ada ukuran" : o.average_pickup_seconds + " saat"}</strong><p class="tiny">${o.measurement_count} pengambilan diukur${state.hardware_mode === "simulated" ? " · simulasi" : ""}</p></div></div></section><section class="panel"><div class="panel-head"><div><h2>Aktiviti terkini</h2><p>Jejak tindakan sistem dan operator</p></div>${icon("clock")}</div><div class="activity">${o.activity
+        .slice(0, 4)
+        .map(
+          (a) =>
+            `<div class="activity-item"><div class="activity-mark">${icon(a.action.includes("PAYMENT") ? "wallet" : a.action.includes("DOOR") ? "lock" : "box")}</div><div><strong>${actionLabel(a.action)}</strong><p>${esc(a.parcel_id || a.detail || "PAP-01")}</p></div><time>${new Date(a.created_at * 1000).toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kuala_Lumpur" })}</time></div>`,
+        )
+        .join(
+          "",
+        )}</div></section></div><div class="section-head"><h2>Parcel terkini</h2>${button("Lihat semua", "nav", "quiet", "arrow", 'data-view="parcels"')}</div><section class="panel">${parcelTable(state.parcels.slice(0, 5), true)}</section>`,
+  );
 }
 function actionLabel(action) {
   return (
@@ -420,13 +449,15 @@ function actionLabel(action) {
   );
 }
 function renderDeposit() {
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "OPERASI STESEN",
       "Simpan parcel baharu.",
       "Daftar penerima, pilih saiz dan simpan parcel dalam loker.",
     ) +
-    `<div class="grid-two"><section class="panel panel-pad"><form id="deposit-form"><div class="error-message" role="alert"></div><div class="form-grid"><div class="field wide"><label for="recipient">Penerima berdaftar</label><select id="recipient" name="recipient_id" required><option value="">Pilih penerima</option>${state.recipients.map((u) => `<option value="${u.id}">${esc(u.name)} · ${esc(u.student_id)}</option>`).join("")}</select><small>Penerima boleh mendaftar akaun sendiri. Admin boleh menambah akaun di menu Pengguna.</small></div>${field("Nombor tracking", "tracking", "text", "Contoh: SPXMY01234567", 'required minlength="4" maxlength="60" pattern="[a-zA-Z0-9-]+"')}<div class="field"><label for="courier">Syarikat kurier</label><select id="courier" name="courier" required>${["SPX Express", "J&T Express", "Ninja Van", "Pos Laju", "DHL eCommerce", "Flash Express", "Lain-lain"].map((v) => `<option>${v}</option>`).join("")}</select></div><div class="field"><label for="size">Saiz parcel</label><select id="size" name="size">${["S", "M", "L", "XL"].map((s) => `<option value="${s}">${s} · ${s === "S" || s === "M" ? "RM0.50" : "RM1.00"}</option>`).join("")}</select></div><div class="field"><label for="locker">Petak loker</label><select id="locker" name="locker_id"></select></div></div><div class="info-note">${icon("lock")}Parcel hanya berstatus “Sedia diambil” selepas pintu ditutup dan penyimpanan disahkan.</div><div class="form-actions"><button class="button primary" type="submit">Buka loker & simpan${icon("arrow")}</button></div></form></section><div class="stack"><section class="panel station-panel"><div class="station-top"><div><strong>PAP-01</strong><small>${state.station.available} petak tersedia</small></div><span class="pill green"><span class="status-dot"></span>Sistem tersedia</span></div>${cabinet({ controls: true })}</section></div></div>`;
+      `<div class="grid-two"><section class="panel panel-pad"><form id="deposit-form"><div class="error-message" role="alert"></div><div class="form-grid"><div class="field wide"><label for="recipient">Penerima berdaftar</label><select id="recipient" name="recipient_id" required><option value="">Pilih penerima</option>${state.recipients.map((u) => `<option value="${u.id}">${esc(u.name)} · ${esc(u.student_id)}</option>`).join("")}</select><small>Penerima boleh mendaftar akaun sendiri. Admin boleh menambah akaun di menu Pengguna.</small></div>${field("Nombor tracking", "tracking", "text", "Contoh: SPXMY01234567", 'required minlength="4" maxlength="60" pattern="[a-zA-Z0-9-]+"')}<div class="field"><label for="courier">Syarikat kurier</label><select id="courier" name="courier" required>${["SPX Express", "J&T Express", "Ninja Van", "Pos Laju", "DHL eCommerce", "Flash Express", "Lain-lain"].map((v) => `<option>${v}</option>`).join("")}</select></div><div class="field"><label for="size">Saiz parcel</label><select id="size" name="size">${["S", "M", "L", "XL"].map((s) => `<option value="${s}">${s} · ${s === "S" || s === "M" ? "RM0.50" : "RM1.00"}</option>`).join("")}</select></div><div class="field"><label for="locker">Petak loker</label><select id="locker" name="locker_id"></select></div></div><div class="info-note">${icon("lock")}Parcel hanya berstatus “Sedia diambil” selepas pintu ditutup dan penyimpanan disahkan.</div><div class="form-actions"><button class="button primary" type="submit">Buka loker & simpan${icon("arrow")}</button></div></form></section><div class="stack"><section class="panel station-panel"><div class="station-top"><div><strong>PAP-01</strong><small>${state.station.available} petak tersedia</small></div><span class="pill green"><span class="status-dot"></span>Sistem tersedia</span></div>${cabinet({ controls: true })}</section></div></div>`,
+  );
   updateDepositLockers();
 }
 function updateDepositLockers() {
@@ -454,18 +485,21 @@ async function depositDialog(pid) {
 }
 function renderLockers() {
   const admin = state.user.role === "admin";
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "STESEN PAP-01",
       "Ruang untuk setiap parcel.",
       "Status petak dikemas kini daripada pangkalan data stesen.",
       button("Muat semula", "refresh", "secondary", "refresh"),
     ) +
-    `<div class="stats">${stat("Jumlah petak", 16, "Empat saiz: S, M, L dan XL", "grid")}${stat("Tersedia", state.station.available, "Boleh menerima parcel", "check", true)}${stat("Digunakan", state.station.occupied, "Parcel dalam simpanan", "box")}${stat("Penyelenggaraan", state.station.lockers.filter((l) => l.maintenance).length, "Dikecualikan daripada agihan", "tool")}</div><section class="panel panel-pad"><div class="row" style="margin-bottom:20px"><h2 style="font-size:18px">Pelan petak loker</h2><span class="tiny muted">${admin ? "Klik petak untuk mengurus" : "PAP-01"}</span></div><div class="locker-grid">${state.station.lockers.map((l) => `<button class="locker-tile ${l.state}" data-action="locker-detail" data-id="${l.id}"><div class="row"><strong>${l.id}</strong>${icon(l.maintenance ? "tool" : l.state === "available" ? "box" : "lock")}</div><div class="row"><small>SAIZ ${l.size}</small><small>${{ available: "Kosong", occupied: "Terisi", maintenance: "Selenggara", open: "Terbuka" }[l.state]}</small></div></button>`).join("")}</div><div class="info-note">${icon("info")}Petak yang digunakan atau pintunya masih terbuka tidak boleh ditawarkan kepada parcel baharu.</div></section>`;
+      `<div class="stats">${stat("Jumlah petak", 16, "Empat saiz: S, M, L dan XL", "grid")}${stat("Tersedia", state.station.available, "Boleh menerima parcel", "check", true)}${stat("Digunakan", state.station.occupied, "Parcel dalam simpanan", "box")}${stat("Penyelenggaraan", state.station.lockers.filter((l) => l.maintenance).length, "Dikecualikan daripada agihan", "tool")}</div><section class="panel panel-pad"><div class="row" style="margin-bottom:20px"><h2 style="font-size:18px">Pelan petak loker</h2><span class="tiny muted">${admin ? "Klik petak untuk mengurus" : "PAP-01"}</span></div><div class="locker-grid">${state.station.lockers.map((l) => `<button class="locker-tile ${l.state}" data-action="locker-detail" data-id="${l.id}"><div class="row"><strong>${l.id}</strong>${icon(l.maintenance ? "tool" : l.state === "available" ? "box" : "lock")}</div><div class="row"><small>SAIZ ${l.size}</small><small>${{ available: "Kosong", occupied: "Terisi", maintenance: "Selenggara", open: "Terbuka" }[l.state]}</small></div></button>`).join("")}</div><div class="info-note">${icon("info")}Petak yang digunakan atau pintunya masih terbuka tidak boleh ditawarkan kepada parcel baharu.</div></section>`,
+  );
 }
 function renderNotifications() {
   const unread = state.notifications.some((n) => !n.read_at);
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "KEMAS KINI",
       "Notifikasi.",
@@ -486,29 +520,34 @@ function renderNotifications() {
             )
           : ""),
     ) +
-    `<section class="panel">${state.notifications.length ? state.notifications.map((n) => `<article class="notification ${n.read_at ? "" : "unread"}"><div class="notification-icon">${icon(n.title.includes("selesai") ? "check" : "box")}</div><div><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p><time>${date(n.created_at)}</time></div>${!n.read_at ? '<span class="status-dot orange" style="margin-left:auto;flex-shrink:0"></span>' : ""}</article>`).join("") : empty("Belum ada notifikasi", "Kemas kini parcel akan muncul di sini.", "bell")}</section>`;
+      `<section class="panel">${state.notifications.length ? state.notifications.map((n) => `<article class="notification ${n.read_at ? "" : "unread"}"><div class="notification-icon">${icon(n.title.includes("selesai") ? "check" : "box")}</div><div><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p><time>${date(n.created_at)}</time></div>${!n.read_at ? '<span class="status-dot accent" style="margin-left:auto;flex-shrink:0"></span>' : ""}</article>`).join("") : empty("Belum ada notifikasi", "Kemas kini parcel akan muncul di sini.", "bell")}</section>`,
+  );
 }
 function renderPayments() {
   const total = state.payments
     .filter((p) => p.status === "paid")
     .reduce((v, p) => v + p.amount_cents, 0);
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "REKOD TRANSAKSI",
       "Bayaran parcel.",
       "Setiap bayaran dipadankan dengan satu rujukan parcel.",
     ) +
-    `<div class="stats">${stat("Jumlah disahkan", money(total), state.demo ? "Bayaran simulasi" : "Transaksi dalam senarai ini", "wallet", true)}${stat("Menunggu", state.payments.filter((p) => p.status === "pending" && p.expires_at > Date.now() / 1000).length, "Pengesahan belum diterima", "clock")}${stat("Disahkan", state.payments.filter((p) => p.status === "paid").length, "Direkod secara kekal", "receipt")}${stat("Kaedah", state.demo ? "Demo" : "Kaunter", "Integrasi provider melalui webhook", "shield")}</div><section class="panel"><div class="table-wrap"><table><thead><tr><th>Rujukan / parcel</th><th>Penerima</th><th>Jumlah</th><th>Kaedah</th><th>Status</th><th></th></tr></thead><tbody>${state.payments.map((p) => `<tr><td><strong class="mono">${p.id}</strong><small>${esc(p.tracking)} · ${date(p.created_at)}</small></td><td>${esc(p.recipient_name)}</td><td><strong>${money(p.amount_cents)}</strong></td><td>${p.method === "demo" ? "Simulasi" : p.method === "manual" ? "Kaunter" : esc(p.method)}</td><td><span class="pill ${p.status === "paid" ? "green" : ""}">${{ paid: "Disahkan", pending: p.expires_at > Date.now() / 1000 ? "Menunggu" : "Tamat tempoh", expired: "Tamat tempoh", cancelled: "Dibatalkan" }[p.status] || esc(p.status)}</span></td><td>${p.status === "pending" && p.method === "manual" && p.expires_at > Date.now() / 1000 ? button("Sahkan diterima", "confirm-payment", "secondary small", "", `data-id="${p.id}"`) : ""}</td></tr>`).join("")}</tbody></table></div>${state.payments.length ? "" : empty("Belum ada transaksi", "Transaksi muncul selepas penerima memulakan bayaran di kiosk.", "wallet")}</section>`;
+      `<div class="stats">${stat("Jumlah disahkan", money(total), state.demo ? "Bayaran simulasi" : "Transaksi dalam senarai ini", "wallet", true)}${stat("Menunggu", state.payments.filter((p) => p.status === "pending" && p.expires_at > Date.now() / 1000).length, "Pengesahan belum diterima", "clock")}${stat("Disahkan", state.payments.filter((p) => p.status === "paid").length, "Direkod secara kekal", "receipt")}${stat("Kaedah", state.demo ? "Demo" : "Kaunter", "Integrasi provider melalui webhook", "shield")}</div><section class="panel"><div class="table-wrap"><table><thead><tr><th>Rujukan / parcel</th><th>Penerima</th><th>Jumlah</th><th>Kaedah</th><th>Status</th><th></th></tr></thead><tbody>${state.payments.map((p) => `<tr><td><strong class="mono">${p.id}</strong><small>${esc(p.tracking)} · ${date(p.created_at)}</small></td><td>${esc(p.recipient_name)}</td><td><strong>${money(p.amount_cents)}</strong></td><td>${p.method === "demo" ? "Simulasi" : p.method === "manual" ? "Kaunter" : esc(p.method)}</td><td><span class="pill ${p.status === "paid" ? "green" : ""}">${{ paid: "Disahkan", pending: p.expires_at > Date.now() / 1000 ? "Menunggu" : "Tamat tempoh", expired: "Tamat tempoh", cancelled: "Dibatalkan" }[p.status] || esc(p.status)}</span></td><td>${p.status === "pending" && p.method === "manual" && p.expires_at > Date.now() / 1000 ? button("Sahkan diterima", "confirm-payment", "secondary small", "", `data-id="${p.id}"`) : ""}</td></tr>`).join("")}</tbody></table></div>${state.payments.length ? "" : empty("Belum ada transaksi", "Transaksi muncul selepas penerima memulakan bayaran di kiosk.", "wallet")}</section>`,
+  );
 }
 function renderUsers() {
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "PENTADBIRAN",
       "Akaun & peranan.",
       "Penerima hanya melihat parcel sendiri. Operator dan admin mempunyai akses operasi.",
       button("Tambah pengguna", "new-user", "primary", "plus"),
     ) +
-    `<section class="panel"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>E-mel</th><th>ID kampus</th><th>Peranan</th><th>Didaftar</th></tr></thead><tbody>${state.users.map((u) => `<tr><td><strong>${esc(u.name)}</strong></td><td>${esc(u.email)}</td><td class="mono">${esc(u.student_id)}</td><td><span class="pill ${u.role === "admin" ? "orange" : u.role === "operator" ? "blue" : "green"}">${roleName(u.role)}</span></td><td>${shortDate(u.created_at)}</td></tr>`).join("")}</tbody></table></div></section><div class="info-note">${icon("shield")}Akaun yang mendaftar sendiri menerima peranan penerima sahaja. Peranan operator dan admin hanya boleh dicipta oleh admin.</div>`;
+      `<section class="panel"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>E-mel</th><th>ID kampus</th><th>Peranan</th><th>Didaftar</th></tr></thead><tbody>${state.users.map((u) => `<tr><td><strong>${esc(u.name)}</strong></td><td>${esc(u.email)}</td><td class="mono">${esc(u.student_id)}</td><td><span class="pill ${u.role === "admin" ? "accent" : u.role === "operator" ? "blue" : "green"}">${roleName(u.role)}</span></td><td>${shortDate(u.created_at)}</td></tr>`).join("")}</tbody></table></div></section><div class="info-note">${icon("shield")}Akaun yang mendaftar sendiri menerima peranan penerima sahaja. Peranan operator dan admin hanya boleh dicipta oleh admin.</div>`,
+  );
 }
 function helpContent() {
   return `<div class="help-list">${[
@@ -540,13 +579,15 @@ function helpContent() {
     .join("")}</div>`;
 }
 function renderHelp() {
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "PANDUAN PARCELHUB",
       "Dari loker ke tangan kau.",
       "Empat langkah mudah untuk mengambil parcel.",
     ) +
-    `<div class="grid-two"><section class="panel panel-pad">${helpContent()}</section><div><div class="about-card"><h3>Kod tidak berfungsi?</h3><p>Kod sah selama 72 jam selepas dijana. Buka portal dan jana kod baharu jika kod tamat tempoh. Kod yang sudah digunakan tidak boleh membuka parcel lain.</p></div><div class="about-card"><h3>Parcel lewat atau pintu bermasalah?</h3><p>Caj lewat ialah RM1.00 bagi setiap blok enam jam yang bermula selepas 24 jam. Untuk masalah pintu atau parcel, hubungi operator di kaunter PAP. Jangan paksa pintu loker.</p></div><div class="about-card"><h3>Waktu pengambilan</h3><p>Loker menyokong pengambilan di luar waktu kaunter, tertakluk kepada akses fizikal kampus dan ketersediaan sistem.</p></div>${state.demo ? '<div class="info-note warning">' + icon("info") + "Dalam demo, bayaran dan sensor disimulasikan. Notifikasi dalam aplikasi berfungsi; WhatsApp/SMS belum disambungkan.</div>" : ""}</div></div>`;
+      `<div class="grid-two"><section class="panel panel-pad">${helpContent()}</section><div><div class="about-card"><h3>Kod tidak berfungsi?</h3><p>Kod sah selama 72 jam selepas dijana. Buka portal dan jana kod baharu jika kod tamat tempoh. Kod yang sudah digunakan tidak boleh membuka parcel lain.</p></div><div class="about-card"><h3>Parcel lewat atau pintu bermasalah?</h3><p>Caj lewat ialah RM1.00 bagi setiap blok enam jam yang bermula selepas 24 jam. Untuk masalah pintu atau parcel, hubungi operator di kaunter PAP. Jangan paksa pintu loker.</p></div><div class="about-card"><h3>Waktu pengambilan</h3><p>Loker menyokong pengambilan di luar waktu kaunter, tertakluk kepada akses fizikal kampus dan ketersediaan sistem.</p></div>${state.demo ? '<div class="info-note warning">' + icon("info") + "Dalam demo, bayaran dan sensor disimulasikan. Notifikasi dalam aplikasi berfungsi; WhatsApp/SMS belum disambungkan.</div>" : ""}</div></div>`,
+  );
 }
 function telegramPanel() {
   const t = state.telegram;
@@ -559,28 +600,33 @@ function telegramPanel() {
   const badge = t.connected
     ? '<span class="pill green">Disambungkan</span>'
     : `<span class="pill">${t.enabled ? "Belum disambung" : "Belum diaktifkan"}</span>`;
-  return `<section class="panel panel-pad telegram-panel"><div class="row"><h3>${icon("send")}Notifikasi Telegram</h3>${badge}</div><p>${description}</p>${t.enabled && !t.ready ? `<div class="info-note warning">${icon("info")}Bot belum tersedia. Notifikasi dalam aplikasi tetap boleh dibaca.</div>` : ""}${t.connected ? `<div class="telegram-delivery"><span>${t.last_sent_at ? `Dihantar ke Telegram: ${date(t.last_sent_at)}` : "Belum ada mesej dihantar"}</span>${t.pending ? `<span>${t.pending} mesej menunggu</span>` : ""}${t.failed ? `<span class="text-orange">${t.failed} mesej gagal dihantar</span>` : ""}</div>` : ""}<div class="head-actions">${t.connected ? button("Hantar mesej ujian", "telegram-test", "secondary", "send", t.ready ? "" : "disabled") + button("Putuskan sambungan", "telegram-disconnect", "quiet", "close") : t.enabled ? button("Sambung Telegram", "telegram-link", "primary", "send", t.ready ? "" : "disabled") : ""}${button("Semak status", "telegram-refresh", "quiet", "refresh")}</div><p class="tiny">Kod OTP/QR kekal dalam portal. Untuk berhenti, putuskan sambungan di sini atau hantar /stop kepada bot.</p></section>`;
+  return `<section class="panel panel-pad telegram-panel"><div class="row"><h3>${icon("send")}Notifikasi Telegram</h3>${badge}</div><p>${description}</p>${t.enabled && !t.ready ? `<div class="info-note warning">${icon("info")}Bot belum tersedia. Notifikasi dalam aplikasi tetap boleh dibaca.</div>` : ""}${t.connected ? `<div class="telegram-delivery"><span>${t.last_sent_at ? `Dihantar ke Telegram: ${date(t.last_sent_at)}` : "Belum ada mesej dihantar"}</span>${t.pending ? `<span>${t.pending} mesej menunggu</span>` : ""}${t.failed ? `<span class="text-warning">${t.failed} mesej gagal dihantar</span>` : ""}</div>` : ""}<div class="head-actions">${t.connected ? button("Hantar mesej ujian", "telegram-test", "secondary", "send", t.ready ? "" : "disabled") + button("Putuskan sambungan", "telegram-disconnect", "quiet", "close") : t.enabled ? button("Sambung Telegram", "telegram-link", "primary", "send", t.ready ? "" : "disabled") : ""}${button("Semak status", "telegram-refresh", "quiet", "refresh")}</div><p class="tiny">Kod OTP/QR kekal dalam portal. Untuk berhenti, putuskan sambungan di sini atau hantar /stop kepada bot.</p></section>`;
 }
 function renderSettings() {
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "AKAUN & SISTEM",
       "Tetapan anda.",
       "Maklumat akaun dan status konfigurasi ParcelHub.",
     ) +
-    `<div class="grid-two"><section class="panel panel-pad"><h3>Maklumat akaun</h3><div class="account-detail"><div class="line-row row"><span>Nama</span><strong>${esc(state.user.name)}</strong></div><div class="line-row row"><span>E-mel</span><strong>${esc(state.user.email)}</strong></div><div class="line-row row"><span>ID kampus</span><strong>${esc(state.user.student_id)}</strong></div><div class="line-row row"><span>Peranan</span><strong>${roleName(state.user.role)}</strong></div></div><div class="head-actions">${button("Tukar kata laluan", "password-modal", "secondary", "lock")}${button("Log keluar", "logout", "quiet", "logout")}</div><div class="theme-settings field"><label for="theme-preference">Tema paparan</label><select id="theme-preference" aria-describedby="theme-hint"><option value="system">Ikut peranti</option><option value="light">Cerah</option><option value="dark">Gelap</option></select><small id="theme-hint">Pilihan tema disimpan dalam pelayar ini.</small></div></section><section class="panel panel-pad"><h3>Status aplikasi</h3><div class="account-detail"><div class="line-row row"><span>Persekitaran</span><strong>${state.demo ? "Demonstrasi" : "Operasi"}</strong></div><div class="line-row row"><span>Sensor pintu</span><strong>${state.hardware_mode === "simulated" ? "Simulasi" : "API peranti"}</strong></div><div class="line-row row"><span>Notifikasi</span><strong>${state.telegram?.connected && state.telegramEnabled ? "Aplikasi + Telegram" : "Dalam aplikasi"}</strong></div><div class="line-row row"><span>Bayaran</span><strong>${state.demo ? "Simulasi" : "Kaunter / adapter webhook"}</strong></div><div class="line-row row"><span>Storan</span><strong>SQLite · server</strong></div></div>${state.user.role === "admin" ? `<a class="button secondary" href="/api/admin/export.csv">${icon("download")}Eksport rekod CSV</a>` : ""}</section></div>`;
+      `<div class="grid-two"><section class="panel panel-pad"><h3>Maklumat akaun</h3><div class="account-detail"><div class="line-row row"><span>Nama</span><strong>${esc(state.user.name)}</strong></div><div class="line-row row"><span>E-mel</span><strong>${esc(state.user.email)}</strong></div><div class="line-row row"><span>ID kampus</span><strong>${esc(state.user.student_id)}</strong></div><div class="line-row row"><span>Peranan</span><strong>${roleName(state.user.role)}</strong></div></div><div class="head-actions">${button("Tukar kata laluan", "password-modal", "secondary", "lock")}${button("Log keluar", "logout", "quiet", "logout")}</div><div class="theme-settings field"><label for="theme-preference">Tema paparan</label><select id="theme-preference" aria-describedby="theme-hint"><option value="system">Ikut peranti</option><option value="light">Cerah</option><option value="dark">Gelap</option></select><small id="theme-hint">Pilihan tema disimpan dalam pelayar ini.</small></div></section><section class="panel panel-pad"><h3>Status aplikasi</h3><div class="account-detail"><div class="line-row row"><span>Persekitaran</span><strong>${state.demo ? "Demonstrasi" : "Operasi"}</strong></div><div class="line-row row"><span>Sensor pintu</span><strong>${state.hardware_mode === "simulated" ? "Simulasi" : "API peranti"}</strong></div><div class="line-row row"><span>Notifikasi</span><strong>${state.telegram?.connected && state.telegramEnabled ? "Aplikasi + Telegram" : "Dalam aplikasi"}</strong></div><div class="line-row row"><span>Bayaran</span><strong>${state.demo ? "Simulasi" : "Kaunter / adapter webhook"}</strong></div><div class="line-row row"><span>Storan</span><strong>SQLite · server</strong></div></div>${state.user.role === "admin" ? `<a class="button secondary" href="/api/admin/export.csv">${icon("download")}Eksport rekod CSV</a>` : ""}</section></div>`,
+  );
   $("#view").insertAdjacentHTML("beforeend", telegramPanel());
+  window.ParcelHubMotion?.reveal($(".telegram-panel"));
   syncThemeControls();
 }
 function renderKiosk() {
-  $("#view").innerHTML =
+  paint(
+    "#view",
     pageHead(
       "KIOSK PENGAMBILAN",
       "Parcel kau dah menunggu.",
       "Masukkan kod, selesaikan bayaran dan ambil parcel.",
       button("Cara penggunaan", "help-modal", "secondary", "help"),
     ) +
-    `<div class="kiosk-grid"><section class="panel station-panel"><div class="station-top"><div><strong>Pusat Aktiviti Pelajar</strong><small>Stesen PAP-01 · 16 petak loker</small></div><span class="pill green"><span class="status-dot"></span><span data-station-available>${state.station.available} tersedia</span></span></div><div id="kiosk-scene">${cabinet({ controls: true })}</div><div class="station-bottom"><div class="legend"><span><i></i>Kosong</span><span class="taken"><i></i>Terisi</span><span class="offline"><i></i>Selenggara</span></div><small>${state.hardware_mode === "simulated" ? "MODEL SIMULASI" : "STATUS PERANTI"}</small></div></section><section class="panel kiosk-card" id="kiosk-card"></section></div>${state.demo ? `<div class="kiosk-demo"><strong>DATA DEMO · Kod awal untuk parcel contoh. Jika sudah digunakan atau dijana semula, ambil kod terkini daripada portal penerima.</strong><div class="demo-codes"><button data-action="sample-otp" data-code="482910">482910 · Pengambilan biasa</button><button data-action="sample-otp" data-code="591028">591028 · Parcel lewat</button></div></div>` : ""}`;
+      `<div class="kiosk-grid"><section class="panel station-panel"><div class="station-top"><div><strong>Pusat Aktiviti Pelajar</strong><small>Stesen PAP-01 · 16 petak loker</small></div><span class="pill green"><span class="status-dot"></span><span data-station-available>${state.station.available} tersedia</span></span></div><div id="kiosk-scene">${cabinet({ controls: true })}</div><div class="station-bottom"><div class="legend"><span><i></i>Kosong</span><span class="taken"><i></i>Terisi</span><span class="offline"><i></i>Selenggara</span></div><small>${state.hardware_mode === "simulated" ? "MODEL SIMULASI" : "STATUS PERANTI"}</small></div></section><section class="panel kiosk-card" id="kiosk-card"></section></div>${state.demo ? `<div class="kiosk-demo"><strong>DATA DEMO · Kod awal untuk parcel contoh. Jika sudah digunakan atau dijana semula, ambil kod terkini daripada portal penerima.</strong><div class="demo-codes"><button data-action="sample-otp" data-code="482910">482910 · Pengambilan biasa</button><button data-action="sample-otp" data-code="591028">591028 · Parcel lewat</button></div></div>` : ""}`,
+  );
   renderKioskStep();
 }
 function kioskProgress(index) {
@@ -591,25 +637,33 @@ function renderKioskStep() {
   if (!el) return;
   const p = state.pickup?.parcel;
   if (state.kioskStep === "code")
-    el.innerHTML =
+    paint(
+      el,
       kioskProgress(0) +
-      `<h2>Masukkan kod kau.</h2><p>Gunakan OTP enam digit daripada portal ParcelHub.</p><form id="otp-form"><div class="error-message" role="alert"></div><label class="sr-only" for="otp" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">Kod OTP enam digit</label><input id="otp" class="otp-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="— — — — — —" required><div class="keypad">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "padam", "0", "back"].map((k) => `<button type="button" class="${k.length > 1 ? "subtle" : ""}" data-action="keypad" data-key="${k}" ${k === "back" ? 'aria-label="Padam satu digit"' : ""}>${k === "back" ? icon("backspace") : k === "padam" ? "PADAM" : k}</button>`).join("")}</div><button type="submit" class="button primary full">Teruskan${icon("arrow")}</button></form>${button("Imbas kod QR", "qr-scan", "quiet full", "scan")}<div class="kiosk-bottom">${icon("shield")} Kod disahkan oleh server. Maklumat parcel kekal peribadi.</div>`;
+        `<h2>Masukkan kod kau.</h2><p>Gunakan OTP enam digit daripada portal ParcelHub.</p><form id="otp-form"><div class="error-message" role="alert"></div><label class="sr-only" for="otp" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">Kod OTP enam digit</label><input id="otp" class="otp-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="— — — — — —" required><div class="keypad">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "padam", "0", "back"].map((k) => `<button type="button" class="${k.length > 1 ? "subtle" : ""}" data-action="keypad" data-key="${k}" ${k === "back" ? 'aria-label="Padam satu digit"' : ""}>${k === "back" ? icon("backspace") : k === "padam" ? "PADAM" : k}</button>`).join("")}</div><button type="submit" class="button primary full">Teruskan${icon("arrow")}</button></form>${button("Imbas kod QR", "qr-scan", "quiet full", "scan")}<div class="kiosk-bottom">${icon("shield")} Kod disahkan oleh server. Maklumat parcel kekal peribadi.</div>`,
+    );
   else if (state.kioskStep === "payment") {
     const q = state.pickup.quote;
     const paid = state.payment?.status === "paid";
     const due = paid ? 0 : Math.max(0, q.total_cents - p.paid_cents);
-    el.innerHTML =
+    paint(
+      el,
       kioskProgress(1) +
-      `<h2>${due ? "Semak caj pengambilan." : "Bayaran selesai."}</h2><p>Parcel ${esc(p.courier)} berada di loker <strong>${p.locker_id}</strong>.</p><div class="kiosk-price"><small>RM</small>${(due / 100).toFixed(2)}</div><p class="tiny">${due ? "Baki perlu dibayar" : "Tiada baki bayaran"}</p><div class="kiosk-summary"><div class="line-row row"><span>Nombor tracking</span><strong class="mono">${esc(p.tracking)}</strong></div><div class="line-row row"><span>Caj asas · saiz ${p.size}</span><strong>${money(q.base_cents)}</strong></div><div class="line-row row"><span>Caj lewat · ${q.late_blocks} blok × RM1.00</span><strong>${money(q.late_cents)}</strong></div><div class="line-row row"><span>Bayaran diterima</span><strong class="text-green">${money(p.paid_cents)}</strong></div></div>${due ? button(state.demo ? "Simulasi bayaran " + money(due) : "Dapatkan rujukan bayaran", "kiosk-pay", "primary full", "wallet") : button("Buka loker " + p.locker_id, "kiosk-unlock", "primary full", "lock")}${state.payment?.status === "pending" && !state.demo ? `<div class="info-note">${icon("info")}Bayar di kaunter dan sebut rujukan <strong>${state.payment.id}</strong>.</div>${button("Semak pengesahan bayaran", "kiosk-check-payment", "secondary full", "refresh")}` : ""}<div class="info-note ${state.demo ? "warning" : ""}">${icon("info")}${state.demo ? "Bayaran demo sahaja. Tiada wang sebenar dicaj." : "Bayaran perlu disahkan operator atau penyedia bayaran."}</div>${button("Batal pengambilan", "kiosk-reset", "quiet full")}<div class="kiosk-bottom">Sesi dan harga sah selama 10 minit selepas kod disahkan.</div>`;
+        `<h2>${due ? "Semak caj pengambilan." : "Bayaran selesai."}</h2><p>Parcel ${esc(p.courier)} berada di loker <strong>${p.locker_id}</strong>.</p><div class="kiosk-price"><small>RM</small>${(due / 100).toFixed(2)}</div><p class="tiny">${due ? "Baki perlu dibayar" : "Tiada baki bayaran"}</p><div class="kiosk-summary"><div class="line-row row"><span>Nombor tracking</span><strong class="mono">${esc(p.tracking)}</strong></div><div class="line-row row"><span>Caj asas · saiz ${p.size}</span><strong>${money(q.base_cents)}</strong></div><div class="line-row row"><span>Caj lewat · ${q.late_blocks} blok × RM1.00</span><strong>${money(q.late_cents)}</strong></div><div class="line-row row"><span>Bayaran diterima</span><strong class="text-green">${money(p.paid_cents)}</strong></div></div>${due ? button(state.demo ? "Simulasi bayaran " + money(due) : "Dapatkan rujukan bayaran", "kiosk-pay", "primary full", "wallet") : button("Buka loker " + p.locker_id, "kiosk-unlock", "primary full", "lock")}${state.payment?.status === "pending" && !state.demo ? `<div class="info-note">${icon("info")}Bayar di kaunter dan sebut rujukan <strong>${state.payment.id}</strong>.</div>${button("Semak pengesahan bayaran", "kiosk-check-payment", "secondary full", "refresh")}` : ""}<div class="info-note ${state.demo ? "warning" : ""}">${icon("info")}${state.demo ? "Bayaran demo sahaja. Tiada wang sebenar dicaj." : "Bayaran perlu disahkan operator atau penyedia bayaran."}</div>${button("Batal pengambilan", "kiosk-reset", "quiet full")}<div class="kiosk-bottom">Sesi dan harga sah selama 10 minit selepas kod disahkan.</div>`,
+    );
   } else if (state.kioskStep === "open") {
     const open = p.status === "PICKUP_OPEN";
-    el.innerHTML =
+    paint(
+      el,
       kioskProgress(2) +
-      `<h2>${open ? "Pintu dah terbuka." : "Membuka pintu…"}</h2><p>${open ? "Ambil parcel kau dari loker di bawah." : "Menunggu pengesahan daripada peranti loker."}</p><div class="big-locker">${p.locker_id}</div><p style="text-align:center">${esc(p.courier)} · ${esc(p.tracking)}</p>${open && state.hardware_mode === "simulated" ? `<div class="info-note warning">${icon("info")}Simulasi sensor: sahkan pengambilan dan penutupan pintu.</div><div style="margin-top:25px">${button("Parcel diambil, tutup pintu", "kiosk-close", "primary full", "check", 'data-present="false"')}${button("Tutup pintu, parcel masih di dalam", "kiosk-close", "quiet full", "", 'data-present="true"')}</div>` : `<div class="info-note">${icon("clock")}Status akan dikemas kini secara automatik selepas sensor mengesahkan pintu ditutup.</div>${button("Semak status", "kiosk-poll", "secondary full", "refresh")}`}<div class="kiosk-bottom">${button("Pintu bermasalah?", "kiosk-help", "quiet", "help")}</div>`;
+        `<h2>${open ? "Pintu dah terbuka." : "Membuka pintu…"}</h2><p>${open ? "Ambil parcel kau dari loker di bawah." : "Menunggu pengesahan daripada peranti loker."}</p><div class="big-locker">${p.locker_id}</div><p style="text-align:center">${esc(p.courier)} · ${esc(p.tracking)}</p>${open && state.hardware_mode === "simulated" ? `<div class="info-note warning">${icon("info")}Simulasi sensor: sahkan pengambilan dan penutupan pintu.</div><div style="margin-top:25px">${button("Parcel diambil, tutup pintu", "kiosk-close", "primary full", "check", 'data-present="false"')}${button("Tutup pintu, parcel masih di dalam", "kiosk-close", "quiet full", "", 'data-present="true"')}</div>` : `<div class="info-note">${icon("clock")}Status akan dikemas kini secara automatik selepas sensor mengesahkan pintu ditutup.</div>${button("Semak status", "kiosk-poll", "secondary full", "refresh")}`}<div class="kiosk-bottom">${button("Pintu bermasalah?", "kiosk-help", "quiet", "help")}</div>`,
+    );
   } else if (state.kioskStep === "done")
-    el.innerHTML =
+    paint(
+      el,
       kioskProgress(3) +
-      `<div class="kiosk-success"><div class="success-check">${icon("check")}</div><h2>Parcel dah di tangan.</h2><p>Pengambilan selesai. Terima kasih kerana menutup pintu.</p><div class="kiosk-summary"><div class="line-row row"><span>Parcel</span><strong class="mono">${esc(p.tracking)}</strong></div><div class="line-row row"><span>Loker</span><strong>${p.locker_id}</strong></div><div class="line-row row"><span>Jumlah dibayar</span><strong>${money(p.paid_cents)}</strong></div><div class="line-row row"><span>Selesai</span><strong>${date(p.collected_at)}</strong></div></div>${button("Selesai", "kiosk-reset", "primary full", "check")}</div><div class="kiosk-bottom">Rekod pengambilan tersedia di portal penerima.</div>`;
+        `<div class="kiosk-success"><div class="success-check">${icon("check")}</div><h2>Parcel dah di tangan.</h2><p>Pengambilan selesai. Terima kasih kerana menutup pintu.</p><div class="kiosk-summary"><div class="line-row row"><span>Parcel</span><strong class="mono">${esc(p.tracking)}</strong></div><div class="line-row row"><span>Loker</span><strong>${p.locker_id}</strong></div><div class="line-row row"><span>Jumlah dibayar</span><strong>${money(p.paid_cents)}</strong></div><div class="line-row row"><span>Selesai</span><strong>${date(p.collected_at)}</strong></div></div>${button("Selesai", "kiosk-reset", "primary full", "check")}</div><div class="kiosk-bottom">Rekod pengambilan tersedia di portal penerima.</div>`,
+    );
 }
 async function refreshStation() {
   state.station = await api("/api/station");
@@ -819,8 +873,8 @@ async function route() {
       help: "Panduan",
     }[state.view] || "ParcelHub") + " · ParcelHub";
   shell();
-  $("#view").innerHTML =
-    '<div class="empty"><span class="loader"></span><p>Memuatkan rekod…</p></div>';
+  paint("#view", loadingView());
+  $("#view").setAttribute("aria-busy", "true");
   try {
     const jobs = [refreshStation()];
     if (state.user) {
@@ -894,8 +948,12 @@ async function route() {
       toast(error.message, true);
       return;
     }
-    $("#view").innerHTML =
-      `<section class="panel">${empty("Rekod belum dapat dimuatkan", esc(error.message), "info")}<div style="text-align:center;padding:0 20px 30px">${button("Cuba semula", "refresh", "primary", "refresh")}</div></section>`;
+    paint(
+      "#view",
+      `<section class="panel">${empty("Rekod belum dapat dimuatkan", esc(error.message), "info")}<div style="text-align:center;padding:0 20px 30px">${button("Cuba semula", "refresh", "primary", "refresh")}</div></section>`,
+    );
+  } finally {
+    if (routeId === state.routeId) $("#view")?.removeAttribute("aria-busy");
   }
 }
 function startPolling() {
@@ -1214,11 +1272,13 @@ document.addEventListener("click", async (event) => {
   if (!el || el.disabled) return;
   event.preventDefault();
   if (el.tagName === "BUTTON") el.disabled = true;
+  const finishLoading = window.ParcelHubMotion?.busy(el);
   try {
     await handleAction(el);
   } catch (error) {
     toast(error.message, true);
   } finally {
+    finishLoading?.();
     if (el.isConnected) el.disabled = false;
   }
 });
@@ -1229,6 +1289,7 @@ document.addEventListener("submit", async (event) => {
   const submit = $('[type="submit"]', form);
   if (submit?.disabled) return;
   if (submit) submit.disabled = true;
+  const finishLoading = window.ParcelHubMotion?.busy(submit);
   const errorBox = $(".error-message", form);
   if (errorBox) errorBox.textContent = "";
   const values = Object.fromEntries(new FormData(form));
@@ -1298,13 +1359,14 @@ document.addEventListener("submit", async (event) => {
   } catch (error) {
     formError(form, error);
   } finally {
+    finishLoading?.();
     if (submit?.isConnected) submit.disabled = false;
   }
 });
 document.addEventListener("input", (event) => {
   if (event.target.id === "parcel-search") {
     state.search = event.target.value;
-    renderParcelResults();
+    quietly(renderParcelResults);
   }
   if (event.target.id === "otp")
     event.target.value = event.target.value.replace(/\D/g, "").slice(0, 6);
@@ -1337,8 +1399,10 @@ async function boot() {
     });
     await route();
   } catch (error) {
-    $("#app").innerHTML =
-      `<main class="initial-loader"><h2>ParcelHub belum tersedia.</h2><p>${esc(error.message)}</p>${button("Cuba semula", "refresh", "primary", "refresh")}</main>`;
+    paint(
+      "#app",
+      `<main class="initial-loader"><h2>ParcelHub belum tersedia.</h2><p>${esc(error.message)}</p>${button("Cuba semula", "refresh", "primary", "refresh")}</main>`,
+    );
   }
 }
 boot();
@@ -1382,10 +1446,12 @@ setInterval(async () => {
     state.station = station;
     if (overview) state.overview = overview;
     if (changed) {
-      if (state.view === "home") renderHome();
-      if (state.view === "parcels") renderParcelResults();
-      if (state.view === "lockers") renderLockers();
-      if (state.view === "notifications") renderNotifications();
+      quietly(() => {
+        if (state.view === "home") renderHome();
+        if (state.view === "parcels") renderParcelResults();
+        if (state.view === "lockers") renderLockers();
+        if (state.view === "notifications") renderNotifications();
+      });
       const bell = $('.topbar [data-view="notifications"]');
       if (bell)
         bell.innerHTML =
