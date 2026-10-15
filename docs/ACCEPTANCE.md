@@ -21,5 +21,11 @@ Use a fresh demo database and test desktop and phone layouts in a normal browser
 | Small screen | Open at 390px width | Menu collapses; kiosk form is before the model; tables scroll within their container |
 | Keyboard access | Tab through login, code, modal and actions | Visible focus indicators, labelled inputs, modal can close with Escape |
 | Reduced motion | Enable OS reduce motion | Cabinet and feedback animations stop |
+| Telegram linking | Configure the bot/worker; use a personal account and press Start through its private link | Only that account is connected; reusing/expiring the link fails; groups are ignored |
+| Telegram delivery | Link, send a test, then complete a parcel transaction | Queued changes to sent after Bot API acceptance; no OTP/QR is included |
+| Telegram outage | Simulate a temporary transport error | Parcel/inbox changes commit; queued delivery retries without blocking the web app |
+| Telegram opt-out | Disconnect or send /stop with a pending message | Pending message is cancelled; linking another chat does not redirect the old queue |
+
+Telegram tests use a fake transport. Check actual chat delivery only after configuring a dedicated bot and explicitly connecting your own account. The default demo sends no external messages.
 
 For a real device, verify relay operation and independent door/parcel sensing. A close sensor alone does not prove parcel removal; supply a parcel-presence sensor or a documented trusted operator confirmation.

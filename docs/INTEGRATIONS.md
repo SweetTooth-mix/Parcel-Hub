@@ -91,6 +91,8 @@ This helper changes the target application's payment state and makes **no provid
 
 ## Notifications
 
-In-app notifications are implemented and scoped to the recipient. The application makes no WhatsApp or SMS network requests. Automatic overdue reminders are inserted into the recipient's in-app inbox every 12 hours, while the app is running.
+In-app notifications are scoped to each recipient. Optional Telegram delivery uses a dedicated Bot API worker, private-chat account linking and a transactional outbox. See [Telegram setup and operations](TELEGRAM.md).
 
-A future WhatsApp/SMS integration needs a verified recipient phone field, consent, approved provider templates, credentials, an outbox with retry/idempotency tracking and provider delivery receipts. Do not treat an inserted in-app notification as proof that a phone message was delivered. The current UI labels the implemented channel accurately.
+Automatic overdue reminders are created every 12 hours while the web app is running. The same transaction queues Telegram delivery only for an already linked account. Creating an inbox item or queue entry is not proof of delivery; `sent` means Telegram accepted the message, not that the user read it.
+
+Email, WhatsApp and SMS delivery are not implemented. Email remains an account/login identifier.

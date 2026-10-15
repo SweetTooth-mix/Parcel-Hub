@@ -388,6 +388,36 @@ textarea:focus {
   margin-top: 24px;
   padding-top: 20px;
 }
+.telegram-panel {
+  margin-top: 22px;
+}
+.telegram-panel > .row {
+  flex-wrap: wrap;
+}
+.telegram-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.telegram-panel > p {
+  font-size: 12px;
+  margin-top: 14px;
+  max-width: 650px;
+}
+.telegram-panel .head-actions {
+  margin-top: 18px;
+}
+.telegram-delivery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 14px;
+}
+.telegram-link .button {
+  margin: 18px 0 12px;
+}
 .notif-dot {
   position: absolute;
   right: 7px;

@@ -11,6 +11,7 @@ def housekeeping(settings):
         db.execute("DELETE FROM sessions WHERE expires_at<=?", (now,))
         db.execute("DELETE FROM pickup_sessions WHERE expires_at<=?", (now,))
         db.execute("DELETE FROM rate_limits WHERE expires_at<=?", (now,))
+        db.execute("DELETE FROM telegram_links WHERE expires_at<=?", (now,))
         db.execute(
             "UPDATE payments SET status='expired' WHERE status='pending' AND expires_at<=?",
             (now,),
@@ -36,7 +37,7 @@ def housekeeping(settings):
                     "system",
                     "AUTO_REMINDER",
                     row["id"],
-                    "In-app; sela minimum 12 jam.",
+                    "Dalam aplikasi dan Telegram jika disambung; sela minimum 12 jam.",
                 )
         if settings.hardware_mode == "device":
             stalled = db.execute(

@@ -40,6 +40,27 @@ Antaramuka menggunakan Bahasa Melayu, menyokong telefon dan desktop, dan tidak m
 
 Tema cerah/gelap mengikuti tetapan peranti secara lalai. Gunakan butang bulan/matahari di halaman log masuk atau bar atas untuk menukar tema. Pilihan disimpan dalam pelayar dan kekal selepas refresh atau log keluar. Pilih **Akaun & sistem → Tema paparan → Ikut peranti** untuk kembali mengikuti tema peranti.
 
+## Aktifkan Telegram (pilihan)
+
+1. Cipta bot khusus ParcelHub melalui [@BotFather](https://t.me/BotFather), menggunakan `/newbot`.
+2. Salin `.env.example` ke `.env` jika belum ada. Isi `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_BOT_USERNAME` (tanpa `@`). Token hanya disimpan pada server; jangan commit atau tampal dalam chat.
+3. Jalankan aplikasi bersama worker:
+
+   ```bash
+   docker compose --profile telegram up --build -d
+   ```
+
+4. Log masuk → **Akaun & sistem → Sambung Telegram → Buka Telegram → Start**. Kembali ke portal dan tekan **Saya sudah tekan Start**.
+5. Tekan **Hantar mesej ujian** dan semak chat. Untuk berhenti, gunakan **Putuskan sambungan** atau `/stop` dalam bot.
+
+Bot menghantar notifikasi baharu sahaja: parcel sedia diambil, peringatan, pengambilan selesai dan masalah loker. OTP/QR kekal dalam portal. E-mel notifikasi belum digunakan; alamat e-mel masih digunakan untuk login.
+
+Worker menggunakan long polling, jadi demo tempatan tidak memerlukan webhook atau domain awam. Server mesti boleh mengakses `api.telegram.org` melalui HTTPS. Jalankan **satu worker sahaja** bagi bot ini. Untuk pautan portal dalam mesej, tetapkan `APP_ORIGIN` kepada URL HTTPS aplikasi anda.
+
+Untuk Python tanpa Docker, tetapkan environment yang sama seperti proses aplikasi (termasuk `DATA_DIR`, `APP_SECRET` dan kedua-dua pemboleh ubah Telegram), kemudian jalankan `python -m app.telegram` dalam terminal kedua. Python tidak memuatkan `.env` secara automatik.
+
+[Butiran penghantaran, retry dan penyelesaian masalah](docs/TELEGRAM.md).
+
 ## Cuba satu transaksi
 
 1. Pilih **Penerima** pada halaman log masuk. Akaun demo Aiman mempunyai dua parcel.
@@ -49,6 +70,8 @@ Tema cerah/gelap mengikuti tetapan peranti secara lalai. Gunakan butang bulan/ma
 5. Pilih **Parcel diambil, tutup pintu**. Parcel kini masuk ke sejarah; petak tersedia semula.
 6. Log keluar dan masuk sebagai **Operator**. Daftar parcel baharu, pilih penerima/saiz, kemudian sahkan parcel telah disimpan dan pintu ditutup.
 7. Masuk semula sebagai **Penerima**. Parcel dan notifikasi baharu telah direkod.
+
+**Telegram dalam demo:** tanpa konfigurasi bot, tiada mesej luaran dihantar. Jika Telegram diaktifkan dan akaun disambung, mesej Telegram adalah sebenar. Gunakan akaun ParcelHub sendiri untuk ujian, bukan akaun demo yang dikongsi.
 
 Kod awal demo: `482910` (A02, biasa) dan `591028` (B01, lewat). Kod ini tidak lagi sah selepas digunakan atau dijana semula. Dapatkan kod terkini daripada portal.
 
@@ -69,12 +92,13 @@ Data demo hanya dijana pada pangkalan data kosong dalam `DEMO_MODE=true`. Akaun 
 | Akaun, peranan, pangkalan data, carian dan sejarah | Berfungsi pada server |
 | OTP dan QR | Disahkan pada server; QR standard dengan token rawak, sah 72 jam selepas dijana |
 | Pengiraan caj dan rekod transaksi | Berfungsi; wang disimpan sebagai integer sen |
-| Notifikasi dalam aplikasi | Berfungsi; peringatan automatik setiap 12 jam untuk parcel lewat, diperiksa setiap minit |
+| Notifikasi | Dalam aplikasi; Telegram pilihan selepas pengguna menyambung bot. Peringatan lewat setiap 12 jam |
 | Bayaran demo | Simulasi berlabel; tiada sambungan DuitNow atau caj wang sebenar |
 | Bayaran operasi | Pengesahan kaunter oleh operator, atau webhook bertandatangan daripada adapter penyedia bayaran |
 | Pintu dalam demo | Simulator sensor melalui UI |
 | Hardware sebenar | Protokol arahan/acknowledgement tersedia; perlu controller, sensor dan pemetaan relay sebenar |
-| WhatsApp / SMS | Belum disambung; tiada dakwaan mesej dihantar ke telefon |
+| Telegram | Integrasi Bot API + giliran penghantaran; perlu token BotFather dan worker untuk menghantar mesej sebenar |
+| E-mel / WhatsApp / SMS | Belum disambung |
 | Identiti kampus | Pendaftaran tempatan; SSO dan pengesahan e-mel belum disambung |
 
 Sistem ini ialah implementasi aplikasi lengkap untuk demo/pilot satu stesen. Operasi fizikal, bayaran automatik dan penghantaran mesej luaran memerlukan integrasi serta ujian peranti/provider di lokasi. Ia belum disahkan untuk operasi kampus tanpa pengawasan.

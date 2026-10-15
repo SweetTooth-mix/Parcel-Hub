@@ -87,6 +87,17 @@ test(
         "Recipient dashboard did not load",
       );
       assert.equal(doc.querySelectorAll(".parcel-card").length, 2);
+      await click('[data-action="nav"][data-view="settings"]');
+      await wait(
+        () => doc.querySelector(".telegram-panel"),
+        "Telegram settings missing",
+      );
+      assert.match(
+        doc.querySelector(".telegram-panel").textContent,
+        /belum diaktifkan/,
+      );
+      assert.equal(doc.querySelector('[data-action="telegram-link"]'), null);
+      await click('[data-action="nav"][data-view="home"]');
       await click('[data-action="code"][data-id="PH-DEMO01"]');
       await wait(
         () => doc.querySelector(".code-display"),
@@ -169,6 +180,71 @@ test(
       );
       await click('[data-action="locker-detail"][data-id="C04"]');
       assert.ok(doc.querySelector("#maintenance-form"));
+      await click('[data-action="close-modal"]');
+      // The real API flow above remains offline. Fake Telegram status here tests
+      // the user's connect/test/disconnect controls without sending a message.
+      const backendFetch = window.fetch;
+      const telegram = {
+        enabled: true,
+        ready: true,
+        connected: false,
+        pending: 0,
+        failed: 0,
+        last_sent_at: null,
+      };
+      const telegramWrites = [];
+      window.fetch = async (url, options = {}) => {
+        if (!url.startsWith("/api/telegram")) return backendFetch(url, options);
+        let response = telegram;
+        if (url === "/api/telegram/link") {
+          telegramWrites.push("link");
+          response = {
+            url: "https://t.me/ParcelHubTestBot?start=test-pairing-token",
+            expires_at: Date.now() / 1000 + 600,
+          };
+        } else if (url === "/api/telegram/test") {
+          telegramWrites.push("test");
+          telegram.pending++;
+          response = { queued: true };
+        } else if (url === "/api/telegram/disconnect") {
+          telegramWrites.push("disconnect");
+          telegram.connected = false;
+          telegram.pending = 0;
+          response = { ok: true };
+        }
+        return new window.Response(JSON.stringify(response), { status: 200 });
+      };
+      await click('[data-action="nav"][data-view="settings"]');
+      await click('[data-action="telegram-link"]');
+      const telegramLink = doc.querySelector("#modal a");
+      assert.match(
+        telegramLink.href,
+        /^https:\/\/t\.me\/ParcelHubTestBot\?start=/,
+      );
+      assert.equal(telegramLink.rel, "noopener noreferrer");
+      telegram.connected = true;
+      telegram.display_name = "<b>student</b>";
+      await click('[data-action="telegram-refresh"]');
+      assert.equal(doc.querySelector("#modal").open, false);
+      assert.ok(
+        doc
+          .querySelector(".telegram-panel")
+          .textContent.includes("<b>student</b>"),
+      );
+      assert.equal(doc.querySelector(".telegram-panel b"), null);
+      await click('[data-action="telegram-test"]');
+      assert.match(
+        doc.querySelector(".telegram-panel").textContent,
+        /1 mesej menunggu/,
+      );
+      await click('[data-action="telegram-disconnect"]');
+      await click('[data-action="close-modal"]');
+      assert.equal(telegram.connected, true);
+      await click('[data-action="telegram-disconnect"]');
+      await click('[data-action="telegram-confirm-disconnect"]');
+      assert.equal(telegram.connected, false);
+      assert.ok(doc.querySelector('[data-action="telegram-link"]'));
+      assert.deepEqual(telegramWrites, ["link", "test", "disconnect"]);
     } finally {
       window.happyDOM.abort();
       await window.happyDOM.close();

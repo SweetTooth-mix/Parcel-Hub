@@ -50,4 +50,22 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-PRAGMA user_version=1;
+CREATE TABLE IF NOT EXISTS telegram_accounts (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id), chat_id INTEGER NOT NULL UNIQUE,
+ display_name TEXT NOT NULL, connection_id TEXT NOT NULL UNIQUE, connected_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS telegram_links (
+ token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
+ expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS telegram_outbox (
+ id INTEGER PRIMARY KEY, notification_id INTEGER UNIQUE REFERENCES notifications(id),
+ user_id INTEGER NOT NULL REFERENCES users(id), chat_id INTEGER NOT NULL,
+ connection_id TEXT NOT NULL, text TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent','failed','cancelled')),
+ attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL,
+ lease_until INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, sent_at INTEGER,
+ message_id INTEGER, last_error TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS telegram_outbox_due ON telegram_outbox(status,next_attempt_at);
+PRAGMA user_version=2;

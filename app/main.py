@@ -25,6 +25,7 @@ from .database import initialize, transaction
 from .security import password_hash, password_matches, fingerprint, token
 from . import service as svc
 from .jobs import housekeeping
+from . import telegram
 
 STATIC = Path(__file__).parent / "static"
 
@@ -291,6 +292,7 @@ def create_app(settings=None):
                 "csrf": u["csrf"] if u else None,
                 "demo": cfg.demo,
                 "hardware_mode": cfg.hardware_mode,
+                "telegram_enabled": cfg.telegram_enabled,
                 "station": {
                     "id": "PAP-01",
                     "name": "Pusat Aktiviti Pelajar",
@@ -375,9 +377,56 @@ def create_app(settings=None):
                 (password_hash(data.new_password), u["id"]),
             )
             db.execute("DELETE FROM sessions WHERE user_id=?", (u["id"],))
+            db.execute("DELETE FROM telegram_links WHERE user_id=?", (u["id"],))
             svc.audit(db, u["id"], "PASSWORD_CHANGED")
         response.delete_cookie("ph_session", path="/")
         return {"ok": True}
+
+    @app.get("/api/telegram")
+    def telegram_status(req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req)
+            return telegram.status(db, u["id"], cfg)
+
+    @app.post("/api/telegram/link")
+    def telegram_link(req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req)
+            return telegram.create_link(db, u["id"], cfg)
+
+    @app.post("/api/telegram/disconnect")
+    def telegram_disconnect(req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req)
+            telegram.disconnect(db, u["id"])
+            svc.audit(db, u["id"], "TELEGRAM_DISCONNECTED")
+        return {"ok": True}
+
+    @app.post("/api/telegram/test")
+    def telegram_test(req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req)
+            connection = telegram.status(db, u["id"], cfg)
+            svc.require(
+                connection["ready"] and connection["connected"],
+                "Sambungkan Telegram dan pastikan bot tersedia dahulu.",
+            )
+            now = int(time.time())
+            recent = db.execute(
+                "SELECT 1 FROM notifications WHERE user_id=? AND title='Mesej ujian Telegram' AND created_at>?",
+                (u["id"], now - 60),
+            ).fetchone()
+            svc.require(
+                not recent, "Tunggu satu minit sebelum menghantar ujian lain.", 429
+            )
+            svc.notify(
+                db,
+                u["id"],
+                None,
+                "Mesej ujian Telegram",
+                "Ini mesej ujian untuk notifikasi Telegram ParcelHub.",
+            )
+        return {"queued": True}
 
     @app.get("/api/station")
     def station():

@@ -23,6 +23,7 @@ Required configuration:
 | `ADMIN_EMAIL` | Bootstrap admin e-mail on first start |
 | `ADMIN_PASSWORD` | Strong bootstrap password of at least 12 characters on first start |
 | `PAYMENT_WEBHOOK_SECRET` | Optional independent secret of at least 32 characters; required only for adapter webhooks |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` | Optional BotFather credentials; enable the `telegram` Compose profile to run delivery. See [Telegram](TELEGRAM.md). |
 
 Generate secrets locally with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Store them in the deployment environment; never commit `.env`. Remove the bootstrap password from configuration after successful initialization, and change the password through the app.
 
@@ -42,7 +43,7 @@ python scripts/backup.py --source data/parcelhub.sqlite3 backups/parcelhub-2026-
 
 The script uses SQLite's backup API, verifies integrity, creates a new mode-0600 file and never overwrites an existing backup. Do not copy only the main `.sqlite3` file while the application is writing: recent changes may be in the WAL.
 
-For Docker, run a backup tool/container with access to the named volume, or stop the service before backing up the entire volume. To restore, stop the app, restore the verified database to a fresh data directory, restore the same APP_SECRET, ensure correct ownership, and restart. Retain the old volume until the restored installation is verified.
+For Docker, run a backup tool/container with access to the named volume, or stop the web service **and Telegram worker** before backing up the entire volume. To restore, stop both processes, restore the verified database to a fresh data directory, restore the same APP_SECRET, ensure correct ownership, and restart. Retain the old volume until the restored installation is verified. Restored staging copies must not run with live Telegram credentials because their outbox can contain pending messages.
 
 ## Operations checklist
 
@@ -57,6 +58,7 @@ For Docker, run a backup tool/container with access to the named volume, or stop
 ## Known limits
 
 - No live DuitNow checkout, WhatsApp, SMS or verified campus identity is configured.
+- Telegram delivery is optional and requires a configured bot plus its worker. Tests use a fake transport; live delivery must be checked after configuration.
 - No automatic provider refund, account deletion, password reset email or expired parcel return process.
 - Six-digit codes have a fixed per-client-IP request limit; a large kiosk fleet needs per-device identity and distributed rate limiting.
 - Camera scanning uses the browser's `BarcodeDetector`. Where unavailable, OTP and pasted QR payload remain available; camera access requires HTTPS or localhost.

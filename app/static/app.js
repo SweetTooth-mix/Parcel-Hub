@@ -68,6 +68,7 @@ const paths = {
   tool: "M14 6a5 5 0 0 0-6 6L2 18l4 4 6-6a5 5 0 0 0 6-6l-3 3-4-4z",
   receipt: "M5 3h14v19l-3-2-4 2-4-2-3 2zM8 7h8M8 11h8M8 15h5",
   mail: "M3 5h18v14H3zM3 5l9 8 9-8",
+  send: "m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13",
   moon: "M20.9 13a9 9 0 0 1-9.9-9.9A9 9 0 1 0 20.9 13Z",
   sun: "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
 };
@@ -97,6 +98,8 @@ const state = {
   csrf: null,
   demo: false,
   hardware_mode: "simulated",
+  telegramEnabled: false,
+  telegram: null,
   station: { lockers: [], available: 0, occupied: 0, total: 16 },
   parcels: [],
   notifications: [],
@@ -285,7 +288,7 @@ function renderAuth(register = false) {
   clearInterval(state.poll);
   document.title = "Log masuk · ParcelHub";
   $("#app").innerHTML =
-    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">Data contoh. Tiada bayaran atau mesej luaran dihantar.</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`;
+    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">${state.telegramEnabled ? "Data contoh. Bayaran simulasi; Telegram menghantar mesej sebenar jika disambung." : "Data contoh. Tiada bayaran atau mesej luaran dihantar."}</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`;
 }
 function parcelCard(p) {
   return `<article class="panel parcel-card"><div class="row"><div class="courier-logo">${esc(
@@ -467,14 +470,21 @@ function renderNotifications() {
       "KEMAS KINI",
       "Notifikasi.",
       "Maklumat terkini tentang parcel anda.",
-      unread
-        ? button(
-            "Tandakan semua dibaca",
-            "read-notifications",
-            "secondary",
-            "check",
-          )
-        : "",
+      button(
+        "Tetapan Telegram",
+        "nav",
+        "secondary",
+        "send",
+        'data-view="settings"',
+      ) +
+        (unread
+          ? button(
+              "Tandakan semua dibaca",
+              "read-notifications",
+              "secondary",
+              "check",
+            )
+          : ""),
     ) +
     `<section class="panel">${state.notifications.length ? state.notifications.map((n) => `<article class="notification ${n.read_at ? "" : "unread"}"><div class="notification-icon">${icon(n.title.includes("selesai") ? "check" : "box")}</div><div><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p><time>${date(n.created_at)}</time></div>${!n.read_at ? '<span class="status-dot orange" style="margin-left:auto;flex-shrink:0"></span>' : ""}</article>`).join("") : empty("Belum ada notifikasi", "Kemas kini parcel akan muncul di sini.", "bell")}</section>`;
 }
@@ -538,6 +548,19 @@ function renderHelp() {
     ) +
     `<div class="grid-two"><section class="panel panel-pad">${helpContent()}</section><div><div class="about-card"><h3>Kod tidak berfungsi?</h3><p>Kod sah selama 72 jam selepas dijana. Buka portal dan jana kod baharu jika kod tamat tempoh. Kod yang sudah digunakan tidak boleh membuka parcel lain.</p></div><div class="about-card"><h3>Parcel lewat atau pintu bermasalah?</h3><p>Caj lewat ialah RM1.00 bagi setiap blok enam jam yang bermula selepas 24 jam. Untuk masalah pintu atau parcel, hubungi operator di kaunter PAP. Jangan paksa pintu loker.</p></div><div class="about-card"><h3>Waktu pengambilan</h3><p>Loker menyokong pengambilan di luar waktu kaunter, tertakluk kepada akses fizikal kampus dan ketersediaan sistem.</p></div>${state.demo ? '<div class="info-note warning">' + icon("info") + "Dalam demo, bayaran dan sensor disimulasikan. Notifikasi dalam aplikasi berfungsi; WhatsApp/SMS belum disambungkan.</div>" : ""}</div></div>`;
 }
+function telegramPanel() {
+  const t = state.telegram;
+  if (!t) return "";
+  const description = !t.enabled
+    ? "Telegram belum diaktifkan oleh pentadbir. Notifikasi dalam aplikasi masih tersedia."
+    : t.connected
+      ? `Disambungkan kepada ${esc(t.display_name)}. Makluman parcel dan peringatan akan dihantar ke chat ini.`
+      : "Terima makluman parcel sedia diambil, peringatan lewat dan pengambilan selesai dalam chat Telegram peribadi.";
+  const badge = t.connected
+    ? '<span class="pill green">Disambungkan</span>'
+    : `<span class="pill">${t.enabled ? "Belum disambung" : "Belum diaktifkan"}</span>`;
+  return `<section class="panel panel-pad telegram-panel"><div class="row"><h3>${icon("send")}Notifikasi Telegram</h3>${badge}</div><p>${description}</p>${t.enabled && !t.ready ? `<div class="info-note warning">${icon("info")}Bot belum tersedia. Notifikasi dalam aplikasi tetap boleh dibaca.</div>` : ""}${t.connected ? `<div class="telegram-delivery"><span>${t.last_sent_at ? `Dihantar ke Telegram: ${date(t.last_sent_at)}` : "Belum ada mesej dihantar"}</span>${t.pending ? `<span>${t.pending} mesej menunggu</span>` : ""}${t.failed ? `<span class="text-orange">${t.failed} mesej gagal dihantar</span>` : ""}</div>` : ""}<div class="head-actions">${t.connected ? button("Hantar mesej ujian", "telegram-test", "secondary", "send", t.ready ? "" : "disabled") + button("Putuskan sambungan", "telegram-disconnect", "quiet", "close") : t.enabled ? button("Sambung Telegram", "telegram-link", "primary", "send", t.ready ? "" : "disabled") : ""}${button("Semak status", "telegram-refresh", "quiet", "refresh")}</div><p class="tiny">Kod OTP/QR kekal dalam portal. Untuk berhenti, putuskan sambungan di sini atau hantar /stop kepada bot.</p></section>`;
+}
 function renderSettings() {
   $("#view").innerHTML =
     pageHead(
@@ -545,7 +568,8 @@ function renderSettings() {
       "Tetapan anda.",
       "Maklumat akaun dan status konfigurasi ParcelHub.",
     ) +
-    `<div class="grid-two"><section class="panel panel-pad"><h3>Maklumat akaun</h3><div class="account-detail"><div class="line-row row"><span>Nama</span><strong>${esc(state.user.name)}</strong></div><div class="line-row row"><span>E-mel</span><strong>${esc(state.user.email)}</strong></div><div class="line-row row"><span>ID kampus</span><strong>${esc(state.user.student_id)}</strong></div><div class="line-row row"><span>Peranan</span><strong>${roleName(state.user.role)}</strong></div></div><div class="head-actions">${button("Tukar kata laluan", "password-modal", "secondary", "lock")}${button("Log keluar", "logout", "quiet", "logout")}</div><div class="theme-settings field"><label for="theme-preference">Tema paparan</label><select id="theme-preference" aria-describedby="theme-hint"><option value="system">Ikut peranti</option><option value="light">Cerah</option><option value="dark">Gelap</option></select><small id="theme-hint">Pilihan tema disimpan dalam pelayar ini.</small></div></section><section class="panel panel-pad"><h3>Status aplikasi</h3><div class="account-detail"><div class="line-row row"><span>Persekitaran</span><strong>${state.demo ? "Demonstrasi" : "Operasi"}</strong></div><div class="line-row row"><span>Sensor pintu</span><strong>${state.hardware_mode === "simulated" ? "Simulasi" : "API peranti"}</strong></div><div class="line-row row"><span>Notifikasi</span><strong>Dalam aplikasi</strong></div><div class="line-row row"><span>Bayaran</span><strong>${state.demo ? "Simulasi" : "Kaunter / adapter webhook"}</strong></div><div class="line-row row"><span>Storan</span><strong>SQLite · server</strong></div></div>${state.user.role === "admin" ? `<a class="button secondary" href="/api/admin/export.csv">${icon("download")}Eksport rekod CSV</a>` : ""}</section></div>`;
+    `<div class="grid-two"><section class="panel panel-pad"><h3>Maklumat akaun</h3><div class="account-detail"><div class="line-row row"><span>Nama</span><strong>${esc(state.user.name)}</strong></div><div class="line-row row"><span>E-mel</span><strong>${esc(state.user.email)}</strong></div><div class="line-row row"><span>ID kampus</span><strong>${esc(state.user.student_id)}</strong></div><div class="line-row row"><span>Peranan</span><strong>${roleName(state.user.role)}</strong></div></div><div class="head-actions">${button("Tukar kata laluan", "password-modal", "secondary", "lock")}${button("Log keluar", "logout", "quiet", "logout")}</div><div class="theme-settings field"><label for="theme-preference">Tema paparan</label><select id="theme-preference" aria-describedby="theme-hint"><option value="system">Ikut peranti</option><option value="light">Cerah</option><option value="dark">Gelap</option></select><small id="theme-hint">Pilihan tema disimpan dalam pelayar ini.</small></div></section><section class="panel panel-pad"><h3>Status aplikasi</h3><div class="account-detail"><div class="line-row row"><span>Persekitaran</span><strong>${state.demo ? "Demonstrasi" : "Operasi"}</strong></div><div class="line-row row"><span>Sensor pintu</span><strong>${state.hardware_mode === "simulated" ? "Simulasi" : "API peranti"}</strong></div><div class="line-row row"><span>Notifikasi</span><strong>${state.telegram?.connected && state.telegramEnabled ? "Aplikasi + Telegram" : "Dalam aplikasi"}</strong></div><div class="line-row row"><span>Bayaran</span><strong>${state.demo ? "Simulasi" : "Kaunter / adapter webhook"}</strong></div><div class="line-row row"><span>Storan</span><strong>SQLite · server</strong></div></div>${state.user.role === "admin" ? `<a class="button secondary" href="/api/admin/export.csv">${icon("download")}Eksport rekod CSV</a>` : ""}</section></div>`;
+  $("#view").insertAdjacentHTML("beforeend", telegramPanel());
   syncThemeControls();
 }
 function renderKiosk() {
@@ -829,6 +853,12 @@ async function route() {
             if (routeId === state.routeId) state.payments = d.payments;
           }),
         );
+      if (state.view === "settings")
+        jobs.push(
+          api("/api/telegram").then((d) => {
+            if (routeId === state.routeId) state.telegram = d;
+          }),
+        );
       if (state.view === "users")
         jobs.push(
           api("/api/admin/users").then((d) => {
@@ -890,6 +920,44 @@ async function signedIn(result) {
 async function handleAction(el) {
   const action = el.dataset.action;
   switch (action) {
+    case "telegram-link": {
+      const link = await api("/api/telegram/link", "POST", {});
+      openModal(
+        "Sambung Telegram",
+        `<div class="telegram-link"><p>Buka bot melalui pautan ini, kemudian tekan <strong>Start</strong> dalam Telegram. Kembali ke sini untuk semak sambungan.</p><a class="button primary full" href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${icon("send")}Buka Telegram</a><p class="tiny">Pautan peribadi ini sah sehingga ${date(link.expires_at)}. Jangan kongsikannya.</p>${state.demo ? '<div class="info-note warning">Telegram menghantar mesej sebenar walaupun parcel dalam mod demo. Gunakan akaun ParcelHub sendiri.</div>' : ""}${button("Saya sudah tekan Start", "telegram-refresh", "secondary full", "refresh")}</div>`,
+      );
+      break;
+    }
+    case "telegram-refresh":
+      state.telegram = await api("/api/telegram");
+      if (state.telegram.connected) closeModal();
+      if (state.view === "settings") renderSettings();
+      if ($("#modal").open)
+        toast(
+          "Belum disambung. Tekan Start dalam Telegram, kemudian semak lagi.",
+        );
+      break;
+    case "telegram-disconnect":
+      openModal(
+        "Putuskan Telegram?",
+        `<p>Notifikasi dalam aplikasi kekal tersedia. Mesej Telegram yang sedang dihantar mungkin masih sampai.</p><div class="form-actions">${button("Batal", "close-modal", "secondary")}${button("Putuskan sambungan", "telegram-confirm-disconnect", "danger")}</div>`,
+      );
+      break;
+    case "telegram-confirm-disconnect":
+      await api("/api/telegram/disconnect", "POST", {});
+      state.telegram = await api("/api/telegram");
+      closeModal();
+      renderSettings();
+      toast("Telegram diputuskan.");
+      break;
+    case "telegram-test":
+      await api("/api/telegram/test", "POST", {});
+      state.telegram = await api("/api/telegram");
+      renderSettings();
+      toast(
+        "Mesej ujian dalam giliran penghantaran. Semak Telegram sebentar lagi.",
+      );
+      break;
     case "toggle-theme":
       window.ParcelHubTheme.set(
         window.ParcelHubTheme.current === "dark" ? "light" : "dark",
@@ -1264,6 +1332,7 @@ async function boot() {
       csrf: me.csrf,
       demo: me.demo,
       hardware_mode: me.hardware_mode,
+      telegramEnabled: me.telegram_enabled,
       station,
     });
     await route();

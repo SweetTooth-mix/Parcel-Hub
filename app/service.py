@@ -22,9 +22,17 @@ def audit(db, actor, action, parcel_id=None, detail=""):
 
 
 def notify(db, uid, pid, title, body):
-    db.execute(
+    now = int(time.time())
+    notification = db.execute(
         "INSERT INTO notifications(user_id,parcel_id,title,body,created_at) VALUES (?,?,?,?,?)",
-        (uid, pid, title, body, int(time.time())),
+        (uid, pid, title, body, now),
+    )
+    # The same transaction commits the inbox item and optional Telegram delivery.
+    db.execute(
+        """INSERT INTO telegram_outbox
+           (notification_id,user_id,chat_id,connection_id,text,next_attempt_at,created_at)
+           SELECT ?,user_id,chat_id,connection_id,?,?,? FROM telegram_accounts WHERE user_id=?""",
+        (notification.lastrowid, f"ParcelHub · {title}\n\n{body}", now, now, uid),
     )
 
 
