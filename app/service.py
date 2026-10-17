@@ -3,6 +3,8 @@
 import math
 import secrets
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from fastapi import HTTPException
 from .security import fingerprint, token
 
@@ -21,12 +23,17 @@ def audit(db, actor, action, parcel_id=None, detail=""):
     )
 
 
-def notify(db, uid, pid, title, body):
+def notify(db, uid, pid, title, body, code_hash=None):
     now = int(time.time())
     notification = db.execute(
         "INSERT INTO notifications(user_id,parcel_id,title,body,created_at) VALUES (?,?,?,?,?)",
         (uid, pid, title, body, now),
     )
+    if code_hash:
+        db.execute(
+            "INSERT INTO notification_codes VALUES (?,?,?)",
+            (notification.lastrowid, pid, code_hash),
+        )
     # The same transaction commits the inbox item and optional Telegram delivery.
     db.execute(
         """INSERT INTO telegram_outbox
@@ -94,7 +101,8 @@ def generate_code(db, p, settings):
         p["status"] == "READY", "Kod hanya boleh dijana untuk parcel sedia diambil."
     )
     for _ in range(30):
-        code = str(secrets.randbelow(900000) + 100000)
+        nonce = token()
+        code, qr = derive_code(p["id"], nonce, settings)
         hashed = fingerprint(code, settings.secret)
         if not db.execute(
             "SELECT 1 FROM parcels WHERE otp_hash=?", (hashed,)
@@ -102,7 +110,10 @@ def generate_code(db, p, settings):
             break
     else:
         raise HTTPException(503, "Kod tidak dapat dijana. Cuba sebentar lagi.")
-    qr = token()
+    db.execute(
+        "INSERT INTO pickup_credentials VALUES (?,?) ON CONFLICT(parcel_id) DO UPDATE SET nonce=excluded.nonce",
+        (p["id"], nonce),
+    )
     expires = int(time.time()) + 72 * 3600
     db.execute(
         "UPDATE parcels SET otp_hash=?,qr_hash=?,code_expires_at=? WHERE id=?",
@@ -110,6 +121,74 @@ def generate_code(db, p, settings):
     )
     db.execute("DELETE FROM pickup_sessions WHERE parcel_id=?", (p["id"],))
     return {"otp": code, "qr_token": qr, "expires_at": expires}
+
+
+def derive_code(pid, nonce, settings):
+    # Domain-separated HMAC: deriving codes requires both the nonce and APP_SECRET.
+    otp = str(
+        100000
+        + int(fingerprint(f"pickup-otp:{pid}:{nonce}", settings.secret), 16) % 900000
+    )
+    qr = fingerprint(f"pickup-qr:{pid}:{nonce}", settings.secret)
+    return otp, qr
+
+
+def current_code(db, p, settings):
+    if p["status"] != "READY" or (p.get("code_expires_at") or 0) <= time.time():
+        return None
+    row = db.execute(
+        "SELECT nonce FROM pickup_credentials WHERE parcel_id=?", (p["id"],)
+    ).fetchone()
+    if not row:
+        return None
+    otp, qr = derive_code(p["id"], row["nonce"], settings)
+    if fingerprint(otp, settings.secret) != p["otp_hash"]:
+        return None
+    return {"otp": otp, "qr_token": qr, "expires_at": p["code_expires_at"]}
+
+
+def code_notice(db, p, title="Kod pengambilan baharu"):
+    notify(
+        db,
+        p["recipient_id"],
+        p["id"],
+        title,
+        f"{p['courier']} · {p['tracking']}\nLoker {p['locker_id']} · PAP-01. Tempoh asas simpanan 24 jam.",
+        code_hash=p["otp_hash"],
+    )
+
+
+def ensure_code(db, p, settings):
+    require(p["status"] == "READY", "Parcel belum sedia diambil.")
+    result = current_code(db, p, settings)
+    if not result:
+        result = generate_code(db, p, settings)
+        code_notice(db, parcel(db, p["id"]))
+    return result
+
+
+def notification_text(db, notification_id, body, settings):
+    ref = db.execute(
+        "SELECT * FROM notification_codes WHERE notification_id=?", (notification_id,)
+    ).fetchone()
+    if not ref:
+        return body, False
+    p = parcel(db, ref["parcel_id"])
+    code = current_code(db, p, settings)
+    if not code or ref["otp_hash"] != p["otp_hash"]:
+        return (
+            body
+            + "\nKod ini telah diganti, tamat atau digunakan. Semak status parcel dalam portal.",
+            True,
+        )
+    expiry = datetime.fromtimestamp(
+        code["expires_at"], ZoneInfo("Asia/Kuala_Lumpur")
+    ).strftime("%d/%m/%Y %H:%M MYT")
+    return (
+        body
+        + f"\n\nKod pengambilan: {code['otp']}\nSah sehingga {expiry}. Jangan kongsikan kod ini.",
+        False,
+    )
 
 
 def pickup(db, raw, settings):
@@ -239,17 +318,16 @@ def door_event(db, cid, event, parcel_present, actor, settings, detail=""):
                     "UPDATE parcels SET status='READY',deposited_at=? WHERE id=?",
                     (now, p["id"]),
                 )
-                generate_code(db, parcel(db, p["id"]), settings)
-                notify(
-                    db,
-                    p["recipient_id"],
-                    p["id"],
-                    "Parcel sedia diambil",
-                    f"{p['courier']}: ambil parcel di loker {p['locker_id']}, PAP. Dapatkan kod di portal. Tempoh asas 24 jam.",
-                )
+                ready = parcel(db, p["id"])
+                generate_code(db, ready, settings)
+                code_notice(db, parcel(db, p["id"]), "Parcel sedia diambil")
             else:
                 db.execute(
                     "UPDATE parcels SET status='CANCELLED' WHERE id=?", (p["id"],)
+                )
+                db.execute(
+                    "UPDATE orders SET status='ACCEPTED',updated_at=? WHERE parcel_id=? AND status='FULFILLING'",
+                    (now, p["id"]),
                 )
         elif not parcel_present:
             seconds = max(0, now - (p["unlock_started_at"] or now))

@@ -12,6 +12,7 @@ def housekeeping(settings):
         db.execute("DELETE FROM pickup_sessions WHERE expires_at<=?", (now,))
         db.execute("DELETE FROM rate_limits WHERE expires_at<=?", (now,))
         db.execute("DELETE FROM telegram_links WHERE expires_at<=?", (now,))
+        db.execute("DELETE FROM telegram_drafts WHERE expires_at<=?", (now,))
         db.execute(
             "UPDATE payments SET status='expired' WHERE status='pending' AND expires_at<=?",
             (now,),

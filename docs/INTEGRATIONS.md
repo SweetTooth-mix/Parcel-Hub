@@ -91,7 +91,7 @@ This helper changes the target application's payment state and makes **no provid
 
 ## Notifications
 
-In-app notifications are scoped to each recipient. Optional Telegram delivery uses a dedicated Bot API worker, private-chat account linking and a transactional outbox. See [Telegram setup and operations](TELEGRAM.md).
+In-app notifications are scoped to each account. New customer orders notify operators/admins; accepted and ready events notify the customer. Confirmed storage automatically issues a pickup code and queues its delivery. Optional Telegram delivery uses a dedicated Bot API worker, private-chat account linking and a transactional outbox. See [Telegram setup and operations](TELEGRAM.md).
 
 Automatic overdue reminders are created every 12 hours while the web app is running. The same transaction queues Telegram delivery only for an already linked account. Creating an inbox item or queue entry is not proof of delivery; `sent` means Telegram accepted the message, not that the user read it.
 

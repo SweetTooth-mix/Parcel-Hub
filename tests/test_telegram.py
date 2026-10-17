@@ -340,7 +340,7 @@ def test_existing_v1_database_upgrades_without_losing_records(connected_app):
     queue(cfg)
     assert tg.deliver_one(cfg, FakeTelegram())
     with transaction(cfg) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
 
 
 def test_worker_rejects_wrong_bot_and_existing_webhook(connected_app):

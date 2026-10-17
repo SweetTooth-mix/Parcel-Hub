@@ -1,6 +1,6 @@
 # Architecture
 
-ParcelHub is a single-station web application. One FastAPI process serves the frontend and API. SQLite stores operational records; a one-minute background task handles overdue reminders, expiration and stalled device commands. Currency is integer MYR sen and timestamps are UTC epoch seconds. Displays and daily totals use Asia/Kuala_Lumpur.
+ParcelHub is a single-station web application. One FastAPI process serves the frontend and API. An optional Telegram worker handles private-chat orders and delivery through the same shared order service. SQLite stores operational records; a one-minute background task handles overdue reminders, expiration and stalled device commands. Currency is integer MYR sen and timestamps are UTC epoch seconds. Displays and daily totals use Asia/Kuala_Lumpur.
 
 ```mermaid
 flowchart TB
@@ -13,15 +13,19 @@ flowchart TB
 ## Ownership and access
 
 - Public: station capacity without recipient details, health, login/register, and kiosk code validation.
-- Recipient: only that user's parcels, code generation and notifications. Registration always creates a recipient. Operator/admin roles are created through an authenticated admin endpoint.
-- Operator: parcel registration, recipient lookup, operations overview, reminders and counter payment confirmation.
+- Recipient: only that user's orders, parcels, current code/reissue and notifications. Registration always creates a recipient. Operator/admin roles are created through an authenticated admin endpoint.
+- Operator: incoming order notifications, atomic task claims and assigned storage, parcel registration, recipient lookup, operations overview, reminders and counter payment confirmation.
 - Admin: operator functions plus user creation, maintenance, audited incident recovery and CSV export.
 - Device: a dedicated token can only poll locker commands and report door events. It cannot read account data or choose arbitrary GPIO pins through this API.
 - Payment adapter: a separate HMAC secret verifies exact amount, reference, currency and timestamp. Event IDs are deduplicated.
 
-Sessions use opaque random tokens stored as keyed hashes in SQLite, HttpOnly cookies, SameSite=Strict, and CSRF headers on authenticated writes. Production enables Secure cookies. Passwords use salted scrypt. Collection codes are keyed hashes, and opaque QR tokens contain no personal details. Only the owner can replace/retrieve a new code; staff cannot display existing codes.
+Sessions use opaque random tokens stored as keyed hashes in SQLite, HttpOnly cookies, SameSite=Strict, and CSRF headers on authenticated writes. Production enables Secure cookies. Passwords use salted scrypt. Collection codes are verified with keyed hashes. A per-parcel random nonce plus the separate APP_SECRET derives the current OTP/QR with domain-separated HMAC, allowing the same credential to be shown on web and Telegram without storing it in plaintext. Opaque QR tokens contain no personal details. Only the owner can retrieve or replace codes; staff cannot display them.
 
-## Lifecycle
+## Order lifecycle
+
+A recipient creates a pending request without reserving a bay. One worker atomically claims it; only that worker starts storage. The order links to one parcel and follows the parcel lifecycle below after fulfillment starts. Cancellation before acceptance and staff rejection preserve their reason/history. Empty initial deposits return the order to accepted for retry. Notifications and Telegram outbox entries commit with the order mutation. See [orders](ORDERS.md) for endpoints and state mapping.
+
+## Parcel lifecycle
 
 ```mermaid
 stateDiagram-v2
@@ -58,4 +62,4 @@ Expired or cancelled intents are not auto-credited by a late webhook. The adapte
 
 ## Scope
 
-SQLite and a single worker are deliberate for a small, single-host pilot. Multi-station tenancy, high-availability control, campus SSO, verified email/phone ownership, automated refunds, parcel returns, VIP billing, advertising and provider-specific notification delivery are outside this version. Add migrations before changing schema in a retained installation; do not edit deployed tables ad hoc.
+SQLite and a single worker are deliberate for a small, single-host pilot. Multi-station tenancy, high-availability control, campus SSO, verified email/phone ownership, automated refunds, parcel returns, VIP billing, advertising and notification delivery other than Telegram are outside this version. Add migrations before changing schema in a retained installation; do not edit deployed tables ad hoc.

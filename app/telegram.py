@@ -1,12 +1,15 @@
 """Opt-in Telegram linking and durable delivery. Run: python -m app.telegram.
 
 Only this worker contacts Telegram. Web requests commit an outbox entry, so a
-Telegram outage cannot roll back a parcel transaction. No OTP/QR is sent here.
+Telegram outage cannot roll back a parcel transaction. Pickup OTPs are resolved
+only at delivery, while valid, for the linked recipient.
 """
 
 import json
 import logging
 import re
+import sqlite3
+from fastapi import HTTPException
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -15,6 +18,7 @@ from .config import Settings
 from .database import initialize, transaction
 from .security import fingerprint, token
 from . import service as svc
+from . import bot_orders
 
 LOG = logging.getLogger("parcelhub.telegram")
 LINK_SECONDS = 600
@@ -137,6 +141,7 @@ def create_link(db, uid, cfg):
 def disconnect(db, uid):
     db.execute("DELETE FROM telegram_accounts WHERE user_id=?", (uid,))
     db.execute("DELETE FROM telegram_links WHERE user_id=?", (uid,))
+    db.execute("DELETE FROM telegram_drafts WHERE user_id=?", (uid,))
     db.execute(
         "UPDATE telegram_outbox SET status='cancelled' WHERE user_id=? AND status IN ('pending','sending')",
         (uid,),
@@ -176,6 +181,9 @@ def process_update(cfg, update):
         ):
             return None
         text = message.get("text", "")
+        if not isinstance(text, str) or len(text) > 4096:
+            return None
+        text = text.strip()
         if text.split(" ", 1)[0].split("@")[0] == "/stop":
             account = db.execute(
                 "SELECT user_id FROM telegram_accounts WHERE chat_id=?", (chat_id,)
@@ -189,12 +197,29 @@ def process_update(cfg, update):
             )
         match = re.fullmatch(r"/start(?:@[A-Za-z0-9_]+)? ([A-Za-z0-9_-]{43})", text)
         if not match:
-            if text in ("/start", "/help"):
+            account = db.execute(
+                "SELECT u.* FROM users u JOIN telegram_accounts a ON a.user_id=u.id WHERE a.chat_id=?",
+                (chat_id,),
+            ).fetchone()
+            if not account:
                 return (
                     chat_id,
-                    "Buka ParcelHub → Akaun & sistem → Sambung Telegram. Tekan Start pada pautan itu. Hantar /stop untuk berhenti.",
+                    "Daftar/log masuk di ParcelHub → Akaun & sistem → Sambung Telegram. Tekan Start pada pautan itu untuk membuat order dan menerima kod pengambilan.",
                 )
-            return None
+            db.execute("SAVEPOINT bot_action")
+            try:
+                reply, options = bot_orders.handle(db, dict(account), text, cfg)
+            except (HTTPException, sqlite3.IntegrityError) as error:
+                db.execute("ROLLBACK TO bot_action")
+                reply = (
+                    error.detail
+                    if isinstance(error, HTTPException)
+                    else "Rekod sudah diproses. Semak order sebelum mencuba lagi."
+                )
+                options = {}  # retain the keyboard for the current wizard step
+            finally:
+                db.execute("RELEASE bot_action")
+            return chat_id, reply, options
         link = db.execute(
             "SELECT * FROM telegram_links WHERE token_hash=? AND expires_at>?",
             (fingerprint(match[1], cfg.secret), now),
@@ -225,7 +250,14 @@ def process_update(cfg, update):
         svc.audit(db, link["user_id"], "TELEGRAM_CONNECTED")
         return (
             chat_id,
-            "Telegram disambungkan. Notifikasi parcel baharu akan dihantar di sini. Kod OTP/QR kekal dalam portal. Hantar /stop untuk berhenti.",
+            "Telegram disambungkan. Order, notifikasi dan kod pengambilan boleh diurus di sini. Tekan /help untuk menu. Hantar /stop untuk berhenti.",
+            bot_orders.menu(
+                dict(
+                    db.execute(
+                        "SELECT * FROM users WHERE id=?", (link["user_id"],)
+                    ).fetchone()
+                )
+            ),
         )
 
 
@@ -251,11 +283,20 @@ def deliver_one(cfg, client, now=None):
         if not row:
             return False
         row = dict(row)
+        text, stale = svc.notification_text(
+            db, row["notification_id"], row["text"], cfg
+        )
+        if stale:
+            db.execute(
+                "UPDATE telegram_outbox SET status='cancelled',last_error='code_no_longer_valid' WHERE id=?",
+                (row["id"],),
+            )
+            return True
         db.execute(
             "UPDATE telegram_outbox SET status='sending',attempts=attempts+1,lease_until=? WHERE id=?",
             (now + 60, row["id"]),
         )
-    text = row["text"][:3500]
+    text = text[:3500]
     if cfg.origin.startswith("https://"):
         text += f"\n\nPortal: {cfg.origin}/#notifications"
     try:
@@ -343,7 +384,12 @@ def run_cycle(cfg, client):
         reply = process_update(cfg, update)
         if reply:
             try:
-                client.call("sendMessage", chat_id=reply[0], text=reply[1])
+                client.call(
+                    "sendMessage",
+                    chat_id=reply[0],
+                    text=reply[1],
+                    **(reply[2] if len(reply) > 2 else {}),
+                )
             except TelegramError as error:
                 if error.code == 429:
                     with transaction(cfg) as db:
@@ -352,7 +398,7 @@ def run_cycle(cfg, client):
                         )
                 if error.code in (401, 429):
                     raise
-                # Pairing is durable even if the acknowledgement cannot be sent.
+                # Order/draft changes are durable even if the reply cannot be sent.
                 LOG.warning("Telegram acknowledgement failed (%s)", error.code)
     for _ in range(10):
         if not deliver_one(cfg, client):

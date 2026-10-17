@@ -29,14 +29,14 @@ Windows PowerShell: gantikan arahan `source` dengan `.venv\Scripts\Activate.ps1`
 
 | Bahagian | Fungsi |
 | --- | --- |
-| Penerima | Daftar akaun, log masuk, lihat parcel sendiri, jana semula OTP/QR, notifikasi, sejarah pengambilan, tukar kata laluan |
+| Penerima | Daftar akaun, hantar order melalui web/bot, semak status, terima OTP, QR di web, notifikasi dan sejarah pengambilan |
 | Kiosk | OTP/QR, pecahan caj, bayaran demo atau rujukan kaunter, buka pintu, sahkan pengambilan, resit |
-| Operator | Daftar parcel kepada penerima berdaftar, pilih saiz/petak, sahkan penyimpanan, cari parcel, peringatan, sahkan bayaran kaunter |
+| Operator | Terima tugasan pelanggan, pilih saiz/petak, sahkan penyimpanan melalui web/bot, cari parcel dan sahkan bayaran kaunter |
 | Admin | Semua fungsi operator, tambah pengguna/peranan, penyelenggaraan, pemulihan insiden, statistik daripada transaksi, eksport CSV |
 | Loker | 16 petak S/M/L/XL, model CSS 3D dengan animasi pintu, reservasi atomik, pengesahan pintu melalui simulator atau API peranti |
 | Sistem | SQLite persisten, sesi cookie HttpOnly, kawalan peranan, CSRF, had cubaan kod, log audit, peringatan lewat automatik |
 
-Antaramuka menggunakan Bahasa Melayu, menyokong telefon dan desktop, dan tidak memuatkan font, skrip atau model daripada CDN.
+Antaramuka menggunakan Bahasa Melayu. Telefon mempunyai navigasi bawah, kad order, butang sentuh besar dan borang satu lajur. Desktop mengekalkan sidebar. Tema dan animasi dikekalkan; tiada font, skrip atau model daripada CDN.
 
 Tema cerah/gelap mengikuti tetapan peranti secara lalai. Gunakan butang bulan/matahari di halaman log masuk atau bar atas untuk menukar tema. Pilihan disimpan dalam pelayar dan kekal selepas refresh atau log keluar. Pilih **Akaun & sistem → Tema paparan → Ikut peranti** untuk kembali mengikuti tema peranti.
 
@@ -55,7 +55,7 @@ Palet navy, teal dan champagne digunakan pada kedua-dua tema. Kad muncul ketika 
 4. Log masuk → **Akaun & sistem → Sambung Telegram → Buka Telegram → Start**. Kembali ke portal dan tekan **Saya sudah tekan Start**.
 5. Tekan **Hantar mesej ujian** dan semak chat. Untuk berhenti, gunakan **Putuskan sambungan** atau `/stop` dalam bot.
 
-Bot menghantar notifikasi baharu sahaja: parcel sedia diambil, peringatan, pengambilan selesai dan masalah loker. OTP/QR kekal dalam portal. E-mel notifikasi belum digunakan; alamat e-mel masih digunakan untuk login.
+Pelanggan boleh tekan **Order baharu** dalam bot, isi tracking, kurier, saiz dan catatan, kemudian sahkan penghantaran. Pekerja yang menyambungkan akaun sendiri menerima tugasan melalui web dan Telegram. Selepas parcel disimpan, pelanggan menerima **OTP enam digit yang sama** di web dan chat peribadi; QR tersedia di web. E-mel notifikasi masih ditangguhkan; e-mel hanya untuk login.
 
 Worker menggunakan long polling, jadi demo tempatan tidak memerlukan webhook atau domain awam. Server mesti boleh mengakses `api.telegram.org` melalui HTTPS. Jalankan **satu worker sahaja** bagi bot ini. Untuk pautan portal dalam mesej, tetapkan `APP_ORIGIN` kepada URL HTTPS aplikasi anda.
 
@@ -63,7 +63,18 @@ Untuk Python tanpa Docker, tetapkan environment yang sama seperti proses aplikas
 
 [Butiran penghantaran, retry dan penyelesaian masalah](docs/TELEGRAM.md).
 
-## Cuba satu transaksi
+## Cuba aliran order baharu
+
+1. Masuk sebagai **Penerima → Order baharu**. Isi tracking unik, kurier, anggaran saiz dan catatan. Order belum menempah loker atau mengeluarkan kod.
+2. Masuk sebagai **Operator → Tugasan → Terima tugasan**. Hanya pekerja yang menerima order boleh menyimpannya.
+3. Selepas parcel diterima secara fizikal, pilih **Letak dalam loker**, semak saiz sebenar dan petak.
+4. Masukkan parcel dan tutup pintu. Dalam demo, tekan pengesahan simpanan; dalam mod peranti, sensor mesti mengesahkannya.
+5. Masuk semula sebagai penerima. Kad order dan notifikasi memaparkan loker, kod serta tarikh luput. Bot menghantar OTP jika akaun telah disambung.
+6. Pilih **Kod & QR pengambilan → Gunakan di kiosk**, selesaikan bayaran demo, buka loker dan sahkan parcel diambil. Order berpindah ke Sejarah.
+
+Bot menggunakan aliran yang sama: pelanggan `/order`; pekerja `/tasks`, `/accept ORD-ID`, `/store ORD-ID`, kemudian `/stored ORD-ID` untuk simulasi sahaja. Arahan `/store ORD-ID L` membolehkan saiz sebenar ditukar. Rujuk [panduan order](docs/ORDERS.md).
+
+## Cuba parcel contoh sedia ada
 
 1. Pilih **Penerima** pada halaman log masuk. Akaun demo Aiman mempunyai dua parcel.
 2. Pilih **Kod pengambilan**, kemudian **Gunakan di kiosk**.
@@ -92,7 +103,7 @@ Data demo hanya dijana pada pangkalan data kosong dalam `DEMO_MODE=true`. Akaun 
 | Keupayaan | Status |
 | --- | --- |
 | Akaun, peranan, pangkalan data, carian dan sejarah | Berfungsi pada server |
-| OTP dan QR | Disahkan pada server; QR standard dengan token rawak, sah 72 jam selepas dijana |
+| OTP dan QR | Disahkan pada server; OTP/QR diterbitkan selepas simpanan disahkan, sah 72 jam; melihat kod mengekalkan kod yang sama |
 | Pengiraan caj dan rekod transaksi | Berfungsi; wang disimpan sebagai integer sen |
 | Notifikasi | Dalam aplikasi; Telegram pilihan selepas pengguna menyambung bot. Peringatan lewat setiap 12 jam |
 | Bayaran demo | Simulasi berlabel; tiada sambungan DuitNow atau caj wang sebenar |
@@ -126,12 +137,13 @@ npm run test:ui
 
 Untuk `test:ui`, Python lalai ialah `.venv/bin/python`; pada Windows atau apabila menggunakan Python sistem, tetapkan `PYTHON` kepada executable Python yang mempunyai dependencies aplikasi.
 
-Ujian API meliputi hak akses, CSRF, pengasingan penerima, OTP tamat/diguna semula, QR, caj sempadan waktu, bayaran idempotent, webhook, perebutan petak, sensor, pemulihan insiden, peringatan dan persistensi. Ujian DOM menggunakan API sebenar melalui `TestClient` tanpa port rangkaian untuk aliran penerima/operator/admin.
+Ujian API meliputi order web/bot, tugasan pekerja serentak, draf bot selepas restart, migrasi, penghantaran kod dan pembatalan kod lama, hak akses, CSRF, pengasingan penerima, OTP tamat/diguna semula, QR, caj sempadan waktu, bayaran idempotent, webhook, perebutan petak, sensor, pemulihan insiden, peringatan dan persistensi. Ujian DOM menggunakan API sebenar melalui `TestClient` tanpa port rangkaian untuk aliran penerima/operator/admin.
 
 Ujian DOM **bukan pengesahan rupa visual dalam browser**. Semakan visual pada browser dan peranti fizikal masih perlu dibuat; tiada screenshot dijadikan bukti ujian dalam repo ini.
 
 ## Dokumentasi
 
+- [Order pelanggan, tugasan dan kod](docs/ORDERS.md)
 - [Seni bina dan aliran data](docs/ARCHITECTURE.md)
 - [Integrasi peranti dan bayaran](docs/INTEGRATIONS.md)
 - [Pemasangan operasi, backup dan batasan](docs/OPERATIONS.md)
@@ -143,7 +155,7 @@ Ujian DOM **bukan pengesahan rupa visual dalam browser**. Semakan visual pada br
 ```text
 app/                 FastAPI, SQLite, pengesahan dan workflow
 app/static/          HTML, CSS dan JavaScript; tiada proses build frontend
-app/schema.sql       Skema pangkalan data versi 1
+app/schema.sql       Skema pangkalan data versi 3, migrasi tambahan automatik
 scripts/backup.py    Backup SQLite yang konsisten
 scripts/device_simulator.py  Klien ujian kontrak peranti
 scripts/payment_event.py     Klien webhook untuk staging

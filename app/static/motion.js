@@ -11,6 +11,8 @@
     ".stat",
     ".hero",
     ".panel",
+    ".order-start",
+    ".task-banner",
     ".section-head",
     ".info-note",
     ".help-step",
@@ -31,7 +33,7 @@
     ".kiosk-success",
   ].join(",");
   const titles =
-    ".page-head h1, .story-copy h1, .hero-copy h2, .auth-form-side > h2, .kiosk-card > h2";
+    ".page-head h1, .story-copy h1, .hero-copy h2, .order-start h2, .auth-form-side > h2, .kiosk-card > h2";
 
   function animate(element, frames, options = {}) {
     if (preference.matches || quiet || !element.animate) return null;

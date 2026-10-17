@@ -75,7 +75,7 @@ const paths = {
 const icon = (name, cls = "") =>
   `<svg class="icon icon-${name} ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.box}"/></svg>`;
 const button = (label, action, kind = "primary", ico = "", extra = "") =>
-  `<button class="button ${kind}" data-action="${action}" ${extra}>${ico ? icon(ico) : ""}${label}</button>`;
+  `<button type="button" class="button ${kind}" data-action="${action}" ${extra}>${ico ? icon(ico) : ""}${label}</button>`;
 const brand = () =>
   '<div class="brand"><img src="/static/favicon.svg" alt=""><span>Parcel<b>Hub</b></span></div>';
 function themeToggle() {
@@ -102,6 +102,9 @@ const state = {
   telegram: null,
   station: { lockers: [], available: 0, occupied: 0, total: 16 },
   parcels: [],
+  orders: [],
+  orderFilter: "active",
+  orderSearch: "",
   notifications: [],
   view: "home",
   tab: "active",
@@ -263,6 +266,7 @@ function shell() {
   const unread = state.notifications.filter((n) => !n.read_at).length;
   const names = {
     home: staff ? "Ringkasan operasi" : "Ringkasan",
+    orders: staff ? "Tugasan" : "Order saya",
     parcels: staff ? "Semua parcel" : "Parcel saya",
     kiosk: "Kiosk pengambilan",
     deposit: "Daftar parcel",
@@ -276,7 +280,7 @@ function shell() {
   const mainNav = u
     ? navLink("home", "Ringkasan", staff ? "chart" : "home") +
       navLink("parcels", staff ? "Semua parcel" : "Parcel saya", "box") +
-      (staff ? navLink("deposit", "Daftar parcel", "plus") : "") +
+      navLink("orders", staff ? "Tugasan masuk" : "Order saya", "box") +
       navLink("kiosk", "Kiosk loker", "scan") +
       (staff
         ? navLink("lockers", "Petak loker", "grid") +
@@ -284,6 +288,7 @@ function shell() {
         : navLink("notifications", "Notifikasi", "bell", unread))
     : navLink("kiosk", "Kiosk loker", "scan");
   const utility =
+    (staff ? navLink("deposit", "Simpanan manual", "plus") : "") +
     (u?.role === "admin" ? navLink("users", "Pengguna", "users") : "") +
     navLink("help", "Panduan", "help") +
     (u ? navLink("settings", "Akaun & sistem", "settings") : "");
@@ -299,7 +304,7 @@ function shell() {
               .join(""),
           )
         : "PH"
-    }</span><span class="user-info"><strong>${esc(u?.name || "Selamat datang")}</strong><small>${roleName(u?.role)}</small></span>${icon(u ? "chevron" : "user")}</button></div></aside><div class="shell-body"><header class="topbar"><div class="breadcrumb"><button class="icon-button menu-toggle" data-action="menu" aria-label="Buka menu">${icon("menu")}</button><span>Ruang kerja</span>${icon("chevron")}<b>${names[state.view] || "ParcelHub"}</b></div><div class="topbar-right"><span class="topbar-date">${new Intl.DateTimeFormat("ms-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).format(new Date())}</span>${state.demo ? '<span class="demo-pill">MOD DEMO</span>' : ""}${themeToggle()}${u ? `<button class="icon-button" data-action="nav" data-view="notifications" aria-label="Notifikasi">${icon("bell")}${unread ? '<i class="notif-dot"></i>' : ""}</button>` : button("Log masuk", "login-screen", "secondary", "user")}</div></header><main class="main-content" id="main" tabindex="-1"><div id="view"></div><footer class="footer"><span>© ${new Date().getFullYear()} ParcelHub. Dibina untuk kehidupan kampus.</span><span><span class="status-dot"></span>${state.hardware_mode === "simulated" ? "Simulasi loker · Data disimpan di server" : "Kawalan peranti · PAP-01"}</span></footer></main></div></div>`,
+    }</span><span class="user-info"><strong>${esc(u?.name || "Selamat datang")}</strong><small>${roleName(u?.role)}</small></span>${icon(u ? "chevron" : "user")}</button></div></aside><div class="shell-body"><header class="topbar"><div class="breadcrumb"><button class="icon-button menu-toggle" data-action="menu" aria-label="Buka menu">${icon("menu")}</button><span>Ruang kerja</span>${icon("chevron")}<b>${names[state.view] || "ParcelHub"}</b></div><div class="topbar-right"><span class="topbar-date">${new Intl.DateTimeFormat("ms-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).format(new Date())}</span>${state.demo ? '<span class="demo-pill">MOD DEMO</span>' : ""}${themeToggle()}${u ? `<button class="icon-button" data-action="nav" data-view="notifications" aria-label="Notifikasi">${icon("bell")}${unread ? '<i class="notif-dot"></i>' : ""}</button>` : button("Log masuk", "login-screen", "secondary", "user")}</div></header><main class="main-content" id="main" tabindex="-1"><div id="view"></div><footer class="footer"><span>© ${new Date().getFullYear()} ParcelHub. Dibina untuk kehidupan kampus.</span><span><span class="status-dot"></span>${state.hardware_mode === "simulated" ? "Simulasi loker · Data disimpan di server" : "Kawalan peranti · PAP-01"}</span></footer></main></div>${mobileNav()}</div>`,
   );
 }
 function renderAuth(register = false) {
@@ -308,9 +313,175 @@ function renderAuth(register = false) {
   document.title = "Log masuk · ParcelHub";
   paint(
     "#app",
-    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Gunakan e-mel yang sama semasa operator mendaftarkan parcel." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">${state.telegramEnabled ? "Data contoh. Bayaran simulasi; Telegram menghantar mesej sebenar jika disambung." : "Data contoh. Tiada bayaran atau mesej luaran dihantar."}</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`,
+    `<div class="auth-shell"><section class="auth-story">${brand()}<div class="story-copy"><div class="eyebrow">YOUR CAMPUS. YOUR PARCEL.</div><h1>Parcel sampai.<br>Ambil ikut<br><em>masa kau.</em></h1><p>Urus parcel kampus dalam satu tempat. Selamat disimpan, mudah diambil di Pusat Aktiviti Pelajar.</p></div>${cabinet()}<div class="story-footer"><span>PAP-01 / PUSAT AKTIVITI PELAJAR</span><span>16 PETAK · 4 SAIZ</span></div></section><main class="auth-form-side" id="main"><div class="auth-tools"><div class="auth-brand-mobile">${brand()}</div>${themeToggle()}</div><div class="eyebrow">${register ? "MULA DENGAN PARCELHUB" : "SELAMAT KEMBALI"}</div><h2>${register ? "Satu akaun, semua parcel." : "Parcel kau, terurus."}</h2><p>${register ? "Daftar sebagai penerima. Hantar order simpanan melalui web atau bot Telegram selepas mendaftar." : "Log masuk untuk semak parcel, dapatkan kod pengambilan dan lihat kemas kini terkini."}</p><form id="auth-form" data-register="${register}"><div class="error-message" role="alert"></div>${register ? field("Nama penuh", "name", "text", "Nama pada kad pelajar", 'required minlength="2" maxlength="80" autocomplete="name"') + field("No. matrik / ID staf", "student_id", "text", "Contoh: CA23019", 'required minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+"') : ""}${field("Alamat e-mel", "email", "email", "nama@kampus.edu.my", 'required maxlength="160" autocomplete="username"')}${field("Kata laluan", "password", "password", register ? "Sekurang-kurangnya 10 aksara" : "Masukkan kata laluan", `required maxlength="128" ${register ? 'minlength="10"' : ""} autocomplete="${register ? "new-password" : "current-password"}"`)}<button type="submit" class="button primary full">${register ? "Cipta akaun" : "Log masuk"}${icon("arrow")}</button></form><div class="auth-switch">${register ? "Sudah ada akaun?" : "Belum ada akaun?"} <button class="text-button" data-action="auth-switch" data-register="${!register}">${register ? "Log masuk" : "Daftar sekarang"}</button></div>${state.demo ? `<div class="divider">CUBA DEMO TANPA MENDAFTAR</div><div class="demo-accounts"><button class="demo-account" data-action="demo-login" data-role="recipient">${icon("user")}Penerima</button><button class="demo-account" data-action="demo-login" data-role="operator">${icon("truck")}Operator</button><button class="demo-account" data-action="demo-login" data-role="admin">${icon("chart")}Admin</button></div><p class="auth-small-note">${state.telegramEnabled ? "Data contoh. Bayaran simulasi; Telegram menghantar mesej sebenar jika disambung." : "Data contoh. Tiada bayaran atau mesej luaran dihantar."}</p>` : ""}${button("Terus ke kiosk pengambilan", "nav", "quiet", "scan", 'data-view="kiosk"')}</main></div>`,
   );
 }
+function mobileNav() {
+  if (!state.user) return "";
+  const staff = state.user.role !== "recipient";
+  const unread = state.notifications.filter((n) => !n.read_at).length;
+  return `<nav class="mobile-nav" aria-label="Navigasi telefon">${[
+    ["home", "Utama", "home"],
+    ["orders", staff ? "Tugasan" : "Order", "box"],
+    ["notifications", "Notifikasi", "bell"],
+    ["settings", "Akaun", "user"],
+  ]
+    .map(
+      ([view, label, ico]) =>
+        `<button type="button" class="mobile-nav-item ${state.view === view ? "active" : ""}" data-action="nav" data-view="${view}" ${state.view === view ? 'aria-current="page"' : ""}>${icon(ico)}<span>${label}</span>${view === "notifications" ? `<i class="mobile-unread" ${unread ? "" : "hidden"}>${unread}</i>` : ""}</button>`,
+    )
+    .join("")}</nav>`;
+}
+function orderCard(o) {
+  const staff = state.user.role !== "recipient";
+  const mine = o.assigned_to === state.user.id;
+  const closed = ["CANCELLED", "REJECTED"].includes(o.status);
+  const step =
+    o.status === "COLLECTED"
+      ? 3
+      : ["READY", "UNLOCK_PENDING", "PICKUP_OPEN"].includes(o.status)
+        ? 2
+        : o.status === "PENDING"
+          ? 0
+          : 1;
+  let actions = "";
+  if (staff) {
+    if (o.status === "PENDING")
+      actions =
+        button(
+          "Terima tugasan",
+          "order-accept",
+          "primary",
+          "check",
+          `data-id="${o.id}"`,
+        ) + button("Tolak", "order-reject", "quiet", "", `data-id="${o.id}"`);
+    if (o.status === "ACCEPTED" && mine)
+      actions =
+        button(
+          "Letak dalam loker",
+          "order-store",
+          "primary",
+          "box",
+          `data-id="${o.id}"`,
+        ) + button("Tolak", "order-reject", "quiet", "", `data-id="${o.id}"`);
+    if (o.status === "RESERVED" && mine)
+      actions = button(
+        "Teruskan simpanan",
+        "resume-deposit",
+        "primary",
+        "lock",
+        `data-id="${o.parcel_id}"`,
+      );
+    if (o.status === "ISSUE")
+      actions = button(
+        "Semak masalah",
+        "detail",
+        "secondary",
+        "info",
+        `data-id="${o.parcel_id}"`,
+      );
+  } else {
+    if (o.status === "PENDING")
+      actions = button(
+        "Batalkan order",
+        "order-cancel",
+        "quiet",
+        "",
+        `data-id="${o.id}"`,
+      );
+    if (o.status === "READY")
+      actions = button(
+        "Kod & QR pengambilan",
+        "code",
+        "primary",
+        "qr",
+        `data-id="${o.parcel_id}"`,
+      );
+    if (
+      ["COLLECTED", "ISSUE", "UNLOCK_PENDING", "PICKUP_OPEN"].includes(o.status)
+    )
+      actions = button(
+        "Butiran parcel",
+        "detail",
+        "secondary",
+        "box",
+        `data-id="${o.parcel_id}"`,
+      );
+  }
+  return `<article class="panel order-card" data-order="${o.id}"><div class="row"><span class="order-reference mono">${o.id}</span><span class="pill ${o.status === "READY" ? "green" : closed || o.status === "ISSUE" ? "red" : "blue"}">${esc(o.status_label)}</span></div><h3>${esc(o.courier)}</h3><p class="order-tracking mono">${esc(o.tracking)}</p>${staff ? `<p class="order-recipient">${icon("user")}${esc(o.recipient_name)} · ${esc(o.student_id)}</p>` : ""}<div class="order-meta"><span>Anggaran ${esc(o.size)} · PAP-01</span><span>${shortDate(o.created_at)}</span></div>${closed ? "" : `<ol class="order-timeline" aria-label="Kemajuan order">${["Dihantar", "Diproses", "Sedia", "Diambil"].map((label, i) => `<li class="${i <= step ? "complete" : ""}" ${i === step ? 'aria-current="step"' : ""}><i>${i < step ? icon("check") : i + 1}</i><span>${label}</span></li>`).join("")}</ol>`}${o.notes ? `<p class="order-note"><strong>Catatan:</strong> ${esc(o.notes)}</p>` : ""}${o.assigned_name && !closed ? `<p class="order-assignee">Pekerja: ${esc(o.assigned_name)}</p>` : ""}${o.reason ? `<div class="info-note warning">${esc(o.reason)}</div>` : ""}${o.pickup_code && o.status === "READY" ? `<div class="order-pickup"><div><span>KOD PENGAMBILAN</span><strong class="mono">${esc(o.pickup_code.otp)}</strong></div><div><span>LOKER</span><b>${esc(o.parcel.locker_id)}</b></div><small>Sah sehingga ${date(o.pickup_code.expires_at)}</small></div>` : ""}${actions ? `<div class="order-actions">${actions}</div>` : ""}</article>`;
+}
+function renderOrders() {
+  const staff = state.user.role !== "recipient";
+  paint(
+    "#view",
+    pageHead(
+      staff ? "OPERASI PAP-01" : "SIMPANAN PARCEL",
+      staff ? "Tugasan masuk." : "Order saya.",
+      staff
+        ? "Terima tugasan, letak parcel dan sahkan simpanan."
+        : "Hantar permintaan. Kami maklumkan bila parcel sedia diambil.",
+      staff
+        ? button("Muat semula", "refresh", "secondary", "refresh")
+        : button("Order baharu", "new-order", "primary", "plus"),
+    ) +
+      `<div class="toolbar"><div class="tabs" role="group" aria-label="Penapis order">${(staff
+        ? [
+            ["active", "Terbuka"],
+            ["mine", "Tugasan saya"],
+            ["history", "Selesai"],
+          ]
+        : [
+            ["active", "Aktif"],
+            ["history", "Sejarah"],
+          ]
+      )
+        .map(
+          ([key, label]) =>
+            `<button class="tab ${state.orderFilter === key ? "active" : ""}" data-action="order-filter" data-filter="${key}" aria-pressed="${state.orderFilter === key}">${label}</button>`,
+        )
+        .join(
+          "",
+        )}</div><label class="searchbar">${icon("search")}<input id="order-search" type="search" aria-label="Cari order" placeholder="Cari tracking / order" value="${esc(state.orderSearch)}"></label></div><div id="order-results"></div>${!staff ? `<div class="info-note">${icon("send")}Order juga boleh dibuat dalam bot Telegram. Sambungkan akaun melalui menu Akaun.</div>` : ""}`,
+  );
+  renderOrderResults();
+}
+function renderOrderResults() {
+  const items = state.orders.filter((o) => {
+    const done = ["COLLECTED", "CANCELLED", "REJECTED"].includes(o.status);
+    return (
+      (state.orderFilter === "history"
+        ? done
+        : state.orderFilter === "mine"
+          ? !done && o.assigned_to === state.user.id
+          : !done) &&
+      `${o.id} ${o.tracking} ${o.recipient_name}`
+        .toLowerCase()
+        .includes(state.orderSearch.toLowerCase())
+    );
+  });
+  paint(
+    "#order-results",
+    items.length
+      ? `<div class="order-grid">${items.map(orderCard).join("")}</div>`
+      : `<section class="panel">${empty("Tiada order dalam senarai ini.", state.user.role === "recipient" ? "Tekan Order baharu untuk meminta parcel disimpan di PAP." : "Order pelanggan akan muncul di sini selepas dihantar.")}</section>`,
+  );
+}
+function newOrderModal() {
+  openModal(
+    "Order simpanan parcel",
+    `<form id="order-form"><div class="error-message" role="alert"></div><p class="form-intro">Isi maklumat parcel. Pekerja PAP akan menerima tugasan anda.</p><div class="form-grid">${field("Nombor tracking", "tracking", "text", "Contoh: SPXMY01234567", 'required minlength="4" maxlength="60" pattern="[a-zA-Z0-9-]+" autocapitalize="characters"')}<div class="field"><label for="order-courier">Syarikat kurier</label><select id="order-courier" name="courier" required>${["SPX Express", "J&T Express", "Ninja Van", "Pos Laju", "DHL eCommerce", "Flash Express", "Lain-lain"].map((c) => `<option>${c}</option>`).join("")}</select></div><div class="field wide"><label for="order-size">Anggaran saiz parcel</label><select id="order-size" name="size"><option value="S">S · Kecil</option><option value="M" selected>M · Sederhana</option><option value="L">L · Besar</option><option value="XL">XL · Sangat besar</option></select><small>Pekerja akan semak saiz sebenar sebelum memilih loker.</small></div><div class="field wide"><label for="order-notes">Catatan (pilihan)</label><textarea id="order-notes" name="notes" maxlength="300" placeholder="Maklumat yang membantu pekerja mengenal pasti parcel"></textarea></div></div><div class="info-note">${icon("pin")}PAP-01 · Caj asas RM0.50–RM1.00. Caj lewat bermula selepas 24 jam disimpan. Kod diberi selepas simpanan disahkan.</div><div class="form-actions">${button("Batal", "close-modal", "secondary")}<button type="submit" class="button primary">${icon("send")}Hantar order</button></div></form>`,
+  );
+}
+function storeOrderModal(oid) {
+  const o = state.orders.find((o) => o.id === oid);
+  if (!o) return;
+  openModal(
+    "Simpan order · " + oid,
+    `<form id="order-store-form" data-id="${oid}"><div class="error-message" role="alert"></div><p class="form-intro">${esc(o.recipient_name)} · <strong>${esc(o.tracking)}</strong><br>Pastikan parcel telah diterima sebelum membuka loker.</p><div class="form-grid"><div class="field"><label for="size">Saiz sebenar</label><select id="size" name="size">${["S", "M", "L", "XL"].map((size) => `<option ${size === o.size ? "selected" : ""}>${size}</option>`).join("")}</select></div><div class="field"><label for="locker">Petak loker</label><select id="locker" name="locker_id"></select></div></div><div class="form-actions"><button class="button primary" type="submit">${icon("lock")}Buka loker untuk simpan</button></div></form>`,
+  );
+  updateDepositLockers();
+}
+
 function parcelCard(p) {
   return `<article class="panel parcel-card"><div class="row"><div class="courier-logo">${esc(
     p.courier
@@ -322,19 +493,23 @@ function parcelCard(p) {
 }
 function renderHome() {
   if (state.user.role !== "recipient") return renderOverview();
-  const active = state.parcels.filter(
-    (p) => !["COLLECTED", "CANCELLED"].includes(p.status),
+  const active = state.orders.filter(
+    (o) => !["COLLECTED", "CANCELLED", "REJECTED"].includes(o.status),
   );
-  const ready = active.find((p) => p.status === "READY");
+  const legacy = state.parcels.filter(
+    (p) =>
+      !["COLLECTED", "CANCELLED"].includes(p.status) &&
+      !state.orders.some((o) => o.parcel_id === p.id),
+  );
+  const ready = state.parcels.filter((p) => p.status === "READY").length;
   paint(
     "#view",
     pageHead(
-      "RUANG PENERIMA",
+      "PARCELHUB · PAP-01",
       `Hai, ${esc(state.user.name.split(" ")[0])}.`,
-      "Semua parcel kampus kau, dalam satu tempat.",
-      button("Buka kiosk", "nav", "secondary", "scan", 'data-view="kiosk"'),
+      "Nak parcel disimpan? Mulakan dengan satu order.",
     ) +
-      `<div class="stats">${stat("Parcel aktif", active.length, "Menunggu pengambilan", "box", true)}${stat("Sedia diambil", active.filter((p) => p.status === "READY").length, '<span class="status-dot"></span> Di stesen PAP-01', "check")}${stat("Baki caj", money(active.reduce((n, p) => n + p.fees.due_cents, 0)), "Caj berdasarkan tempoh simpanan", "wallet")}${stat("Selesai diambil", state.parcels.filter((p) => p.status === "COLLECTED").length, "Rekod pengambilan anda", "receipt")}</div><div class="grid-two"><section class="hero"><div class="hero-copy"><div class="hero-badge"><span class="status-dot"></span> PARCELHUB · PAP-01</div><h2>Jadual padat?<br>Parcel <em>tunggu kau.</em></h2><p>Datang ke PAP, sahkan kod dan ambil parcel. Semudah itu.</p>${button("Cara pengambilan", "help-modal", "dark", "arrow")}</div>${cabinet({ compact: true })}</section><section class="panel pickup-highlight"><div><div class="row"><div class="large-icon">${icon("box")}</div><span class="pill ${ready ? "green" : ""}">${ready ? "Sedia diambil" : "Semua terurus"}</span></div><h3>${ready ? "Ada parcel untuk kau." : "Belum ada parcel baharu."}</h3><p>${ready ? esc(ready.courier) + " · " + esc(ready.size) + " / " + date(ready.deposited_at) : "Notifikasi akan muncul selepas operator menyimpan parcel."}</p></div>${ready ? `<div class="row" style="margin:16px 0"><div><div class="tiny muted">LOKER PENGAMBILAN</div><div class="locker-number">${ready.locker_id}</div></div><div style="text-align:right"><div class="tiny muted">BAKI CAJ</div><strong>${money(ready.fees.due_cents)}</strong></div></div>${button("Dapatkan kod pengambilan", "code", "primary full", "qr", `data-id="${ready.id}"`)}` : `<div class="info-note">${icon("bell")}Kami akan maklumkan dalam aplikasi ini.</div>`}</section></div><div class="section-head"><h2>Parcel terkini <small class="muted">(${active.length})</small></h2>${button("Lihat semua", "nav", "quiet", "arrow", 'data-view="parcels"')}</div><div class="parcel-cards">${active.slice(0, 3).map(parcelCard).join("") || `<div class="panel" style="grid-column:1/-1">${empty("Tiada parcel aktif", "Parcel baharu akan disenaraikan di sini selepas didaftarkan.")}</div>`}</div><div class="info-note">${icon("info")}Caj asas RM0.50–RM1.00. Selepas 24 jam, caj tambahan RM1.00 bagi setiap blok 6 jam yang bermula. Akses loker tertakluk waktu akses kampus.</div>`,
+      `<section class="order-start"><div><span class="eyebrow">SIMPAN PARCEL ANDA</span><h2>Order dulu.<br>Kami uruskan simpanan.</h2><p>Hantar maklumat parcel dan tunggu kod pengambilan.</p></div>${button("Order baharu", "new-order", "primary", "plus")}<ol><li>1 · Hantar order</li><li>2 · Pekerja simpan</li><li>3 · Ambil dengan kod</li></ol></section><div class="order-summary"><span><b>${active.length}</b> order aktif</span><span><b>${ready}</b> parcel sedia diambil</span></div><div class="section-head"><h2>Order terkini</h2>${button("Lihat semua", "nav", "quiet", "arrow", 'data-view="orders"')}</div><div class="order-grid">${active.slice(0, 3).map(orderCard).join("") || `<section class="panel">${empty("Belum ada order aktif.", "Hantar order melalui web atau bot Telegram.")}</section>`}</div>${legacy.length ? `<div class="section-head"><h2>Parcel sedia ada</h2>${button("Semua parcel", "nav", "quiet", "arrow", 'data-view="parcels"')}</div><div class="parcel-cards">${legacy.slice(0, 3).map(parcelCard).join("")}</div>` : ""}<div class="info-note">${icon("send")}Lebih mudah melalui Telegram? ${button("Sambungkan akaun", "nav", "quiet", "", 'data-view="settings"')}</div>`,
   );
 }
 function filteredParcels() {
@@ -415,9 +590,20 @@ function renderOverview() {
       "PUSAT OPERASI",
       "Setiap parcel, dalam kawalan.",
       "Pantau aktiviti dan kapasiti stesen PAP-01 hari ini.",
-      button("Daftar parcel", "nav", "primary", "plus", 'data-view="deposit"'),
+      button("Tugasan masuk", "nav", "primary", "box", 'data-view="orders"'),
     ) +
-      `<div class="stats">${stat("Parcel aktif", o.active, "Dalam simpanan & pengambilan", "box", true)}${stat("Loker tersedia", `${state.station.available}<small>/ 16</small>`, "Sedia untuk parcel baharu", "grid")}${stat("Lewat tempoh", o.overdue, "Melebihi tempoh asas 24 jam", "clock")}${stat("Kutipan hari ini", money(o.revenue_today_cents), state.demo ? "Transaksi simulasi hari ini" : "Bayaran disahkan hari ini", "wallet")}</div><div class="grid-two"><section class="panel"><div class="panel-head"><div><h2>Pergerakan parcel</h2><p>Tujuh hari terakhir · rekod sebenar aplikasi</p></div><div class="legend"><span><i></i>Masuk</span><span><i class="light"></i>Diambil</span></div></div><div class="chart" role="img" aria-label="${esc(o.trend.map((d) => `${d.day}: ${d.deposited} masuk, ${d.collected} diambil`).join("; "))}">${o.trend.map((d) => `<div class="chart-col" title="${d.day}: ${d.deposited} masuk, ${d.collected} diambil"><div class="chart-bar" style="height:${Math.max(2, (d.deposited / max) * 100)}%"></div><div class="chart-bar light" style="height:${Math.max(2, (d.collected / max) * 100)}%"></div><span class="chart-day">${d.day}</span></div>`).join("")}</div><div class="row" style="padding:0 25px 25px"><div><div class="tiny muted">DIAMBIL HARI INI</div><strong>${o.collected_today} parcel</strong></div><div style="text-align:right"><div class="tiny muted">PURATA BUKA → TUTUP</div><strong>${o.average_pickup_seconds === null ? "Belum ada ukuran" : o.average_pickup_seconds + " saat"}</strong><p class="tiny">${o.measurement_count} pengambilan diukur${state.hardware_mode === "simulated" ? " · simulasi" : ""}</p></div></div></section><section class="panel"><div class="panel-head"><div><h2>Aktiviti terkini</h2><p>Jejak tindakan sistem dan operator</p></div>${icon("clock")}</div><div class="activity">${o.activity
+      `<section class="task-banner"><div><span class="eyebrow">TUGASAN PELANGGAN</span><h2>${state.orders.filter((item) => item.status === "PENDING").length} order menunggu</h2><p>Terima tugasan sebelum memilih petak loker.</p></div>${button("Buka tugasan", "nav", "primary", "box", 'data-view="orders"')}</section><div class="order-grid dashboard-orders">${state.orders
+        .filter(
+          (item) =>
+            item.status === "PENDING" ||
+            (item.assigned_to === state.user.id &&
+              ["ACCEPTED", "RESERVED", "ISSUE"].includes(item.status)),
+        )
+        .slice(0, 2)
+        .map(orderCard)
+        .join(
+          "",
+        )}</div><div class="stats">${stat("Parcel aktif", o.active, "Dalam simpanan & pengambilan", "box", true)}${stat("Loker tersedia", `${state.station.available}<small>/ 16</small>`, "Sedia untuk parcel baharu", "grid")}${stat("Lewat tempoh", o.overdue, "Melebihi tempoh asas 24 jam", "clock")}${stat("Kutipan hari ini", money(o.revenue_today_cents), state.demo ? "Transaksi simulasi hari ini" : "Bayaran disahkan hari ini", "wallet")}</div><div class="grid-two"><section class="panel"><div class="panel-head"><div><h2>Pergerakan parcel</h2><p>Tujuh hari terakhir · rekod sebenar aplikasi</p></div><div class="legend"><span><i></i>Masuk</span><span><i class="light"></i>Diambil</span></div></div><div class="chart" role="img" aria-label="${esc(o.trend.map((d) => `${d.day}: ${d.deposited} masuk, ${d.collected} diambil`).join("; "))}">${o.trend.map((d) => `<div class="chart-col" title="${d.day}: ${d.deposited} masuk, ${d.collected} diambil"><div class="chart-bar" style="height:${Math.max(2, (d.deposited / max) * 100)}%"></div><div class="chart-bar light" style="height:${Math.max(2, (d.collected / max) * 100)}%"></div><span class="chart-day">${d.day}</span></div>`).join("")}</div><div class="row" style="padding:0 25px 25px"><div><div class="tiny muted">DIAMBIL HARI INI</div><strong>${o.collected_today} parcel</strong></div><div style="text-align:right"><div class="tiny muted">PURATA BUKA → TUTUP</div><strong>${o.average_pickup_seconds === null ? "Belum ada ukuran" : o.average_pickup_seconds + " saat"}</strong><p class="tiny">${o.measurement_count} pengambilan diukur${state.hardware_mode === "simulated" ? " · simulasi" : ""}</p></div></div></section><section class="panel"><div class="panel-head"><div><h2>Aktiviti terkini</h2><p>Jejak tindakan sistem dan operator</p></div>${icon("clock")}</div><div class="activity">${o.activity
         .slice(0, 4)
         .map(
           (a) =>
@@ -554,7 +740,7 @@ function helpContent() {
     [
       "1",
       "Dapatkan kod pengambilan",
-      "Log masuk ke portal. Pilih parcel dan tekan “Kod pengambilan”. Kod baharu menggantikan kod sebelumnya.",
+      "Hantar order melalui web atau bot Telegram. Selepas pekerja mengesahkan simpanan, kod muncul di web dan dihantar ke Telegram jika disambung. Melihat kod tidak menukarnya.",
     ],
     [
       "2",
@@ -595,12 +781,12 @@ function telegramPanel() {
   const description = !t.enabled
     ? "Telegram belum diaktifkan oleh pentadbir. Notifikasi dalam aplikasi masih tersedia."
     : t.connected
-      ? `Disambungkan kepada ${esc(t.display_name)}. Makluman parcel dan peringatan akan dihantar ke chat ini.`
-      : "Terima makluman parcel sedia diambil, peringatan lewat dan pengambilan selesai dalam chat Telegram peribadi.";
+      ? `Disambungkan kepada ${esc(t.display_name)}. Buka bot untuk order, tugasan dan kod pengambilan.`
+      : "Buat order, semak status dan terima kod pengambilan dalam chat Telegram peribadi.";
   const badge = t.connected
     ? '<span class="pill green">Disambungkan</span>'
     : `<span class="pill">${t.enabled ? "Belum disambung" : "Belum diaktifkan"}</span>`;
-  return `<section class="panel panel-pad telegram-panel"><div class="row"><h3>${icon("send")}Notifikasi Telegram</h3>${badge}</div><p>${description}</p>${t.enabled && !t.ready ? `<div class="info-note warning">${icon("info")}Bot belum tersedia. Notifikasi dalam aplikasi tetap boleh dibaca.</div>` : ""}${t.connected ? `<div class="telegram-delivery"><span>${t.last_sent_at ? `Dihantar ke Telegram: ${date(t.last_sent_at)}` : "Belum ada mesej dihantar"}</span>${t.pending ? `<span>${t.pending} mesej menunggu</span>` : ""}${t.failed ? `<span class="text-warning">${t.failed} mesej gagal dihantar</span>` : ""}</div>` : ""}<div class="head-actions">${t.connected ? button("Hantar mesej ujian", "telegram-test", "secondary", "send", t.ready ? "" : "disabled") + button("Putuskan sambungan", "telegram-disconnect", "quiet", "close") : t.enabled ? button("Sambung Telegram", "telegram-link", "primary", "send", t.ready ? "" : "disabled") : ""}${button("Semak status", "telegram-refresh", "quiet", "refresh")}</div><p class="tiny">Kod OTP/QR kekal dalam portal. Untuk berhenti, putuskan sambungan di sini atau hantar /stop kepada bot.</p></section>`;
+  return `<section class="panel panel-pad telegram-panel"><div class="row"><h3>${icon("send")}Order & Telegram</h3>${badge}</div><p>${description}</p>${t.enabled && !t.ready ? `<div class="info-note warning">${icon("info")}Bot belum tersedia. Notifikasi dalam aplikasi tetap boleh dibaca.</div>` : ""}${t.connected ? `<div class="telegram-delivery"><span>${t.last_sent_at ? `Dihantar ke Telegram: ${date(t.last_sent_at)}` : "Belum ada mesej dihantar"}</span>${t.pending ? `<span>${t.pending} mesej menunggu</span>` : ""}${t.failed ? `<span class="text-warning">${t.failed} mesej gagal dihantar</span>` : ""}</div>` : ""}<div class="head-actions">${t.connected ? button("Hantar mesej ujian", "telegram-test", "secondary", "send", t.ready ? "" : "disabled") + button("Putuskan sambungan", "telegram-disconnect", "quiet", "close") : t.enabled ? button("Sambung Telegram", "telegram-link", "primary", "send", t.ready ? "" : "disabled") : ""}${button("Semak status", "telegram-refresh", "quiet", "refresh")}</div><p class="tiny">Kod pengambilan dihantar ke chat peribadi selepas simpanan disahkan. Untuk berhenti, putuskan sambungan di sini atau hantar /stop kepada bot.</p></section>`;
 }
 function renderSettings() {
   paint(
@@ -736,13 +922,19 @@ async function pollKiosk() {
   await refreshKioskScene();
 }
 async function showCode(pid) {
-  const r = await api(`/api/parcels/${pid}/code`, "POST", {});
-  const p = state.parcels.find((p) => p.id === pid);
+  let r;
+  try {
+    r = await api(`/api/parcels/${pid}/code`);
+  } catch (error) {
+    if (error.status !== 409) throw error;
+    r = await api(`/api/parcels/${pid}/code`, "POST", {});
+  }
+  const { parcel: p } = await api(`/api/parcels/${pid}`);
   const src =
     "data:image/svg+xml;charset=utf-8," + encodeURIComponent(r.qr_svg);
   openModal(
     "Kod pengambilan",
-    `<div class="code-panel"><span class="pill green">PAP-01 · Loker ${esc(p?.locker_id)}</span><div class="qr-box"><img src="${esc(src)}" width="173" height="173" alt="Kod QR pengambilan parcel"></div><div class="code-display">${esc(r.otp)}</div><p style="margin-top:9px">Sah sehingga ${date(r.expires_at)}</p><div class="info-note">${icon("shield")}Kod ini peribadi. Kod sebelumnya telah dibatalkan.</div>${button("Gunakan di kiosk", "use-code", "primary full", "scan", `data-code="${r.otp}"`)}<p class="tiny" style="margin-top:10px">QR boleh diimbas pada kiosk yang mempunyai kamera.</p></div>`,
+    `<div class="code-panel"><span class="pill green">PAP-01 · Loker ${esc(p?.locker_id)}</span><div class="qr-box"><img src="${esc(src)}" width="173" height="173" alt="Kod QR pengambilan parcel"></div><div class="code-display">${esc(r.otp)}</div><p style="margin-top:9px">Sah sehingga ${date(r.expires_at)}</p><div class="info-note">${icon("shield")}Kod ini sama seperti dalam notifikasi anda. Jangan kongsikannya.</div>${button("Gunakan di kiosk", "use-code", "primary full", "scan", `data-code="${r.otp}"`)}${button("Jana semula kod", "regenerate-code", "quiet full", "refresh", `data-id="${pid}"`)}<p class="tiny" style="margin-top:10px">Jana semula hanya jika perlu. Kod lama akan dibatalkan.</p></div>`,
   );
 }
 async function showDetail(pid) {
@@ -833,6 +1025,7 @@ async function route() {
     state.user?.role === "admin"
       ? [
           "home",
+          "orders",
           "parcels",
           "kiosk",
           "deposit",
@@ -846,6 +1039,7 @@ async function route() {
       : state.user?.role === "operator"
         ? [
             "home",
+            "orders",
             "parcels",
             "kiosk",
             "deposit",
@@ -856,12 +1050,21 @@ async function route() {
             "settings",
           ]
         : state.user
-          ? ["home", "parcels", "kiosk", "notifications", "help", "settings"]
+          ? [
+              "home",
+              "orders",
+              "parcels",
+              "kiosk",
+              "notifications",
+              "help",
+              "settings",
+            ]
           : ["kiosk", "help"];
   state.view = allowed.includes(view) ? view : allowed[0];
   document.title =
     ({
       home: "Ringkasan",
+      orders: "Order & tugasan",
       parcels: "Parcel",
       kiosk: "Kiosk",
       deposit: "Daftar parcel",
@@ -878,6 +1081,11 @@ async function route() {
   try {
     const jobs = [refreshStation()];
     if (state.user) {
+      jobs.push(
+        api("/api/orders").then((d) => {
+          if (routeId === state.routeId) state.orders = d.orders;
+        }),
+      );
       jobs.push(
         api("/api/notifications").then((d) => {
           if (routeId === state.routeId) state.notifications = d.notifications;
@@ -925,6 +1133,7 @@ async function route() {
     shell();
     ({
       home: renderHome,
+      orders: renderOrders,
       parcels: renderParcels,
       kiosk: renderKiosk,
       deposit: renderDeposit,
@@ -972,6 +1181,8 @@ async function signedIn(result) {
   state.csrf = result.csrf;
   state.tab = "active";
   state.search = "";
+  state.orderFilter = "active";
+  state.orderSearch = "";
   history.replaceState(null, "", "#home");
   await route();
 }
@@ -1057,6 +1268,7 @@ async function handleAction(el) {
       state.user = null;
       state.csrf = null;
       state.parcels = [];
+      state.orders = [];
       state.notifications = [];
       state.pickup = null;
       state.kioskStep = "code";
@@ -1081,8 +1293,41 @@ async function handleAction(el) {
       state.tab = el.dataset.tab;
       renderParcels();
       break;
+    case "new-order":
+      newOrderModal();
+      break;
+    case "order-filter":
+      state.orderFilter = el.dataset.filter;
+      renderOrders();
+      break;
+    case "order-accept":
+      await api(`/api/orders/${el.dataset.id}/accept`, "POST", {});
+      await route();
+      toast("Tugasan diterima. Buka loker selepas parcel berada dengan anda.");
+      break;
+    case "order-store":
+      await refreshStation();
+      storeOrderModal(el.dataset.id);
+      break;
+    case "order-cancel":
+      openModal(
+        "Batalkan order?",
+        `<p>Order ${esc(el.dataset.id)} akan dikeluarkan daripada senarai tugasan pekerja.</p><form id="order-cancel-form" data-id="${el.dataset.id}"><div class="error-message" role="alert"></div><div class="form-actions">${button("Kembali", "close-modal", "secondary")}<button class="button primary" type="submit">Ya, batalkan order</button></div></form>`,
+      );
+      break;
+    case "order-reject":
+      openModal(
+        "Tolak order",
+        `<form id="order-reject-form" data-id="${el.dataset.id}"><div class="error-message" role="alert"></div><div class="field"><label for="order-reason">Sebab penolakan</label><textarea name="reason" id="order-reason" required minlength="5" maxlength="300" placeholder="Contoh: Parcel belum diterima di PAP"></textarea><small>Pelanggan akan menerima sebab ini.</small></div><div class="form-actions"><button class="button primary" type="submit">Maklumkan pelanggan</button></div></form>`,
+      );
+      break;
     case "code":
       await showCode(el.dataset.id);
+      break;
+    case "regenerate-code":
+      await api(`/api/parcels/${el.dataset.id}/code`, "POST", {});
+      await showCode(el.dataset.id);
+      toast("Kod baharu dijana. Kod lama telah dibatalkan.");
       break;
     case "use-code": {
       const code = el.dataset.code;
@@ -1121,7 +1366,7 @@ async function handleAction(el) {
       await route();
       toast(
         el.dataset.present === "true"
-          ? "Parcel disimpan. Penerima menerima notifikasi dalam aplikasi."
+          ? "Parcel disimpan. Kod dihantar melalui notifikasi web dan Telegram jika disambung."
           : "Deposit dibatalkan. Loker tersedia semula.",
       );
       break;
@@ -1320,6 +1565,37 @@ document.addEventListener("submit", async (event) => {
         await depositDialog(d.parcel.id);
         break;
       }
+      case "order-form":
+        await api("/api/orders", "POST", values);
+        closeModal();
+        state.orderFilter = "active";
+        state.orderSearch = "";
+        history.replaceState(null, "", "#orders");
+        await route();
+        toast("Order dihantar. Pekerja PAP telah dimaklumkan.");
+        break;
+      case "order-store-form": {
+        if (!values.locker_id) delete values.locker_id;
+        const d = await api(
+          `/api/orders/${form.dataset.id}/store`,
+          "POST",
+          values,
+        );
+        await route();
+        await depositDialog(d.order.parcel_id);
+        break;
+      }
+      case "order-cancel-form":
+      case "order-reject-form":
+        await api(
+          `/api/orders/${form.dataset.id}/${form.id === "order-cancel-form" ? "cancel" : "reject"}`,
+          "POST",
+          values,
+        );
+        closeModal();
+        await route();
+        toast("Order dikemas kini dan pelanggan dimaklumkan.");
+        break;
       case "user-form":
         await api("/api/admin/users", "POST", values);
         closeModal();
@@ -1364,6 +1640,10 @@ document.addEventListener("submit", async (event) => {
   }
 });
 document.addEventListener("input", (event) => {
+  if (event.target.id === "order-search") {
+    state.orderSearch = event.target.value;
+    quietly(renderOrderResults);
+  }
   if (event.target.id === "parcel-search") {
     state.search = event.target.value;
     quietly(renderParcelResults);
@@ -1411,7 +1691,11 @@ boot();
 setInterval(async () => {
   if (!state.user || !state.initialized || document.hidden || $("#modal").open)
     return;
-  if (!["home", "parcels", "lockers", "notifications"].includes(state.view))
+  if (
+    !["home", "orders", "parcels", "lockers", "notifications"].includes(
+      state.view,
+    )
+  )
     return;
   if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName))
     return;
@@ -1419,6 +1703,7 @@ setInterval(async () => {
   const userId = state.user.id;
   try {
     const responses = await Promise.all([
+      api("/api/orders"),
       api("/api/notifications"),
       api("/api/parcels"),
       api("/api/station"),
@@ -1427,20 +1712,24 @@ setInterval(async () => {
         : Promise.resolve(null),
     ]);
     if (routeId !== state.routeId || state.user?.id !== userId) return;
-    const [notifications, parcels, station, overview] = responses;
+    const [orderResponse, notifications, parcels, station, overview] =
+      responses;
     const changed =
       JSON.stringify([
+        state.orders,
         state.notifications,
         state.parcels,
         state.station,
         state.overview,
       ]) !==
       JSON.stringify([
+        orderResponse.orders,
         notifications.notifications,
         parcels.parcels,
         station,
         overview || state.overview,
       ]);
+    state.orders = orderResponse.orders;
     state.notifications = notifications.notifications;
     state.parcels = parcels.parcels;
     state.station = station;
@@ -1448,10 +1737,17 @@ setInterval(async () => {
     if (changed) {
       quietly(() => {
         if (state.view === "home") renderHome();
+        if (state.view === "orders") renderOrders();
         if (state.view === "parcels") renderParcelResults();
         if (state.view === "lockers") renderLockers();
         if (state.view === "notifications") renderNotifications();
       });
+      const mobileBadge = $(".mobile-unread");
+      if (mobileBadge) {
+        const unread = state.notifications.filter((n) => !n.read_at).length;
+        mobileBadge.textContent = unread;
+        mobileBadge.hidden = !unread;
+      }
       const bell = $('.topbar [data-view="notifications"]');
       if (bell)
         bell.innerHTML =

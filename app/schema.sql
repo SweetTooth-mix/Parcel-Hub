@@ -68,4 +68,26 @@ CREATE TABLE IF NOT EXISTS telegram_outbox (
  message_id INTEGER, last_error TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS telegram_outbox_due ON telegram_outbox(status,next_attempt_at);
-PRAGMA user_version=2;
+CREATE TABLE IF NOT EXISTS orders (
+ id TEXT PRIMARY KEY, recipient_id INTEGER NOT NULL REFERENCES users(id),
+ tracking TEXT NOT NULL COLLATE NOCASE, courier TEXT NOT NULL, size TEXT NOT NULL,
+ notes TEXT NOT NULL DEFAULT '', source TEXT NOT NULL CHECK(source IN ('web','telegram')),
+ status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','ACCEPTED','FULFILLING','CANCELLED','REJECTED')),
+ assigned_to INTEGER REFERENCES users(id), parcel_id TEXT UNIQUE REFERENCES parcels(id),
+ created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS active_order_tracking ON orders(tracking)
+ WHERE status NOT IN ('CANCELLED','REJECTED');
+CREATE INDEX IF NOT EXISTS orders_recipient ON orders(recipient_id,created_at);
+CREATE TABLE IF NOT EXISTS telegram_drafts (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id), stage TEXT NOT NULL,
+ data TEXT NOT NULL, expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pickup_credentials (
+ parcel_id TEXT PRIMARY KEY REFERENCES parcels(id), nonce TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notification_codes (
+ notification_id INTEGER PRIMARY KEY REFERENCES notifications(id),
+ parcel_id TEXT NOT NULL REFERENCES parcels(id), otp_hash TEXT NOT NULL
+);
+PRAGMA user_version=3;

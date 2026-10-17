@@ -9,7 +9,7 @@ import { Window } from "happy-dom";
 // DOM integration, not a visual browser test. The Python TestClient handles real
 // server transactions and cookies without starting a preview or listening socket.
 test(
-  "Recipient pickup, operator deposit and admin navigation through real API",
+  "Student orders, worker storage, pickup and admin navigation through real API",
   { timeout: 30000 },
   async () => {
     const py = spawn(
@@ -253,6 +253,103 @@ test(
       await click('[data-action="locker-detail"][data-id="C04"]');
       assert.ok(doc.querySelector("#maintenance-form"));
       await click('[data-action="close-modal"]');
+      // Exercise the new customer-first flow using the same real backend.
+      window.happyDOM.setWindowSize({ width: 390, height: 844 });
+      await click('[data-action="account"]');
+      await click('[data-action="logout"]');
+      await click('[data-action="demo-login"][data-role="recipient"]');
+      await click('[data-action="new-order"]');
+      await click('#order-form [data-action="close-modal"]');
+      assert.equal(doc.querySelector("#modal").open, false);
+      await click('[data-action="new-order"]');
+      doc.querySelector('#order-form [name="tracking"]').value =
+        "MOBILEORDER001";
+      doc.querySelector("#order-notes").value = "<b>Handle with care</b>";
+      submit("#order-form");
+      await wait(
+        () => doc.querySelector(".order-card"),
+        "New order card missing",
+      );
+      assert.match(
+        doc.querySelector(".order-card").textContent,
+        /Menunggu pekerja/,
+      );
+      assert.equal(doc.querySelector(".order-pickup"), null);
+      assert.equal(doc.querySelector(".order-note b"), null);
+      assert.match(
+        doc.querySelector(".order-note").textContent,
+        /<b>Handle with care<\/b>/,
+      );
+      assert.equal(doc.querySelectorAll(".mobile-nav-item").length, 4);
+      assert.equal(
+        doc.querySelector('.mobile-nav [aria-current="page"]').dataset.view,
+        "orders",
+      );
+      const oid = doc.querySelector(".order-card").dataset.order;
+      await click('[data-action="account"]');
+      await click('[data-action="logout"]');
+      await click('[data-action="demo-login"][data-role="operator"]');
+      await click('.mobile-nav [data-view="orders"]');
+      await click(`[data-action="order-accept"][data-id="${oid}"]`);
+      await click(`[data-action="order-store"][data-id="${oid}"]`);
+      await wait(
+        () => doc.querySelector("#order-store-form"),
+        "Storage form missing",
+      );
+      submit("#order-store-form");
+      await click('[data-action="deposit-close"][data-present="true"]');
+      await wait(
+        () =>
+          doc
+            .querySelector(`.order-card[data-order="${oid}"]`)
+            ?.textContent.includes("Sedia diambil"),
+        "Stored order not ready",
+      );
+      assert.equal(doc.querySelector(".order-pickup"), null);
+      await click('[data-action="account"]');
+      await click('[data-action="logout"]');
+      await click('[data-action="demo-login"][data-role="recipient"]');
+      await wait(
+        () => doc.querySelector(".order-pickup strong"),
+        "Customer code missing",
+      );
+      const orderCode = doc.querySelector(".order-pickup strong").textContent;
+      assert.match(orderCode, /^\d{6}$/);
+      await click('.order-card [data-action="code"]');
+      await wait(
+        () => doc.querySelector(".code-display"),
+        "Code modal missing",
+      );
+      assert.equal(doc.querySelector(".code-display").textContent, orderCode);
+      await click('[data-action="close-modal"]');
+      await click('.mobile-nav [data-view="notifications"]');
+      await wait(
+        () =>
+          doc
+            .querySelector(".notification")
+            ?.parentElement.textContent.includes(orderCode),
+        "Code notification missing",
+      );
+      await click('.mobile-nav [data-view="orders"]');
+      await click('.order-card [data-action="code"]');
+      await click('[data-action="use-code"]');
+      await click('[data-action="kiosk-pay"]');
+      await click('[data-action="kiosk-unlock"]');
+      await click('[data-action="kiosk-close"][data-present="false"]');
+      await wait(
+        () => doc.querySelector(".kiosk-success"),
+        "Order pickup receipt missing",
+      );
+      await click('.mobile-nav [data-view="orders"]');
+      await click('[data-action="order-filter"][data-filter="history"]');
+      await wait(
+        () =>
+          doc
+            .querySelector(".order-card")
+            ?.textContent.includes("Selesai diambil"),
+        "Completed order history missing",
+      );
+      assert.equal(doc.querySelector(".order-pickup"), null);
       // The real API flow above remains offline. Fake Telegram status here tests
       // the user's connect/test/disconnect controls without sending a message.
       const backendFetch = window.fetch;

@@ -26,6 +26,7 @@ from .security import password_hash, password_matches, fingerprint, token
 from . import service as svc
 from .jobs import housekeeping
 from . import telegram
+from . import orders
 
 STATIC = Path(__file__).parent / "static"
 
@@ -69,6 +70,22 @@ class Deposit(BaseModel):
     courier: str = Field(min_length=2, max_length=50)
     size: Literal["S", "M", "L", "XL"]
     locker_id: str | None = Field(default=None, max_length=8)
+
+
+class OrderInput(BaseModel):
+    tracking: str = Field(min_length=4, max_length=60)
+    courier: str = Field(min_length=2, max_length=50)
+    size: Literal["S", "M", "L", "XL"] = "M"
+    notes: str = Field(default="", max_length=300)
+
+
+class OrderStore(BaseModel):
+    size: Literal["S", "M", "L", "XL"] | None = None
+    locker_id: str | None = Field(default=None, max_length=8)
+
+
+class OrderReject(BaseModel):
+    reason: str = Field(min_length=5, max_length=300)
 
 
 class Verify(BaseModel):
@@ -456,6 +473,59 @@ def create_app(settings=None):
                 "total": len(result),
             }
 
+    @app.get("/api/orders")
+    def order_list(req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req)
+            return {"orders": orders.listing(db, u, cfg)}
+
+    @app.post("/api/orders", status_code=201)
+    def order_create(data: OrderInput, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req, ("recipient",))
+            o = orders.create(db, u, data.model_dump())
+            return {"order": orders.serialize(db, o, u, cfg)}
+
+    @app.get("/api/orders/{oid}")
+    def order_detail(oid: str, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req)
+            return {"order": orders.serialize(db, orders.get(db, oid, u), u, cfg)}
+
+    @app.post("/api/orders/{oid}/accept")
+    def order_accept(oid: str, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req, ("operator", "admin"))
+            return {"order": orders.serialize(db, orders.accept(db, oid, u), u, cfg)}
+
+    @app.post("/api/orders/{oid}/cancel")
+    def order_cancel(oid: str, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req, ("recipient",))
+            return {"order": orders.serialize(db, orders.cancel(db, oid, u), u, cfg)}
+
+    @app.post("/api/orders/{oid}/reject")
+    def order_reject(oid: str, data: OrderReject, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req, ("operator", "admin"))
+            return {
+                "order": orders.serialize(
+                    db, orders.cancel(db, oid, u, data.reason), u, cfg
+                )
+            }
+
+    @app.post("/api/orders/{oid}/store")
+    def order_store(oid: str, data: OrderStore, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req, ("operator", "admin"))
+            return {"order": orders.store(db, oid, u, cfg, data.size, data.locker_id)}
+
+    @app.post("/api/orders/{oid}/confirm")
+    def order_confirm(oid: str, req: Request):
+        with transaction(cfg) as db:
+            u = user(db, req, ("operator", "admin"))
+            return {"order": orders.confirm_storage(db, oid, u, cfg)}
+
     @app.get("/api/parcels")
     def list_parcels(req: Request):
         with transaction(cfg) as db:
@@ -492,6 +562,7 @@ def create_app(settings=None):
                 "command": dict(c) if c else None,
             }
 
+    @app.get("/api/parcels/{pid}/code")
     @app.post("/api/parcels/{pid}/code")
     def code(pid: str, req: Request):
         with transaction(cfg) as db:
@@ -502,7 +573,16 @@ def create_app(settings=None):
                 "Kod hanya boleh dilihat oleh penerima.",
                 403,
             )
-            result = svc.generate_code(db, p, cfg)
+            if req.method == "POST":
+                result = svc.generate_code(db, p, cfg)
+                svc.code_notice(db, svc.parcel(db, pid))
+                svc.audit(db, u["id"], "PICKUP_CODE_REISSUED", pid)
+            else:
+                result = svc.current_code(db, p, cfg)
+                svc.require(
+                    result is not None,
+                    "Kod belum tersedia atau telah tamat. Jana kod baharu.",
+                )
             # A standards-compliant QR encodes the opaque pickup credential, never personal details.
             qr = qrcode.make(
                 "PARCELHUB:" + result["qr_token"],
@@ -513,7 +593,6 @@ def create_app(settings=None):
             output = io.BytesIO()
             qr.save(output)
             result["qr_svg"] = output.getvalue().decode()
-            svc.audit(db, u["id"], "PICKUP_CODE_REISSUED", pid)
             return result
 
     @app.get("/api/notifications")
@@ -522,7 +601,10 @@ def create_app(settings=None):
             u = user(db, req)
             return {
                 "notifications": [
-                    dict(r)
+                    {
+                        **dict(r),
+                        "body": svc.notification_text(db, r["id"], r["body"], cfg)[0],
+                    }
                     for r in db.execute(
                         "SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 100",
                         (u["id"],),
@@ -564,6 +646,13 @@ def create_app(settings=None):
                 ).fetchone(),
                 "Pilih akaun penerima yang sah.",
                 400,
+            )
+            svc.require(
+                not db.execute(
+                    "SELECT 1 FROM orders WHERE tracking=? AND status NOT IN ('CANCELLED','REJECTED')",
+                    (data.tracking.upper(),),
+                ).fetchone(),
+                "Tracking ini mempunyai order. Proses melalui menu Tugasan.",
             )
             rows = db.execute(
                 """SELECT l.* FROM lockers l WHERE l.size=? AND l.maintenance=0 AND l.door_open=0
@@ -608,6 +697,14 @@ def create_app(settings=None):
         with transaction(cfg) as db:
             u = user(db, req, ("operator", "admin"))
             p = svc.parcel(db, pid)
+            owner = db.execute(
+                "SELECT assigned_to FROM orders WHERE parcel_id=?", (pid,)
+            ).fetchone()
+            svc.require(
+                not owner or owner["assigned_to"] == u["id"],
+                "Order ini di bawah pekerja lain.",
+                403,
+            )
             svc.require(
                 p["status"] == "RESERVED", "Parcel bukan dalam proses penyimpanan."
             )
@@ -974,6 +1071,7 @@ def create_app(settings=None):
             db.execute("DELETE FROM pickup_sessions WHERE parcel_id=?", (pid,))
             if status == "READY":
                 svc.generate_code(db, svc.parcel(db, pid), cfg)
+                svc.code_notice(db, svc.parcel(db, pid), "Parcel sedia diambil semula")
             svc.audit(db, u["id"], "MANUAL_RECOVERY", pid, f"{status}: {data.reason}")
             svc.notify(
                 db,
